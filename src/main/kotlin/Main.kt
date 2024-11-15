@@ -101,7 +101,7 @@ private class Application : CliktCommand() {
         )
 
         val subtitleFile = File(output.path.replaceAfterLast('.', "vtt"))
-        subtitleFile.writeText("WEBVTT\n\n")
+        subtitleFile.writeText("WEBVTT")
 
         val chunks = lines.map { line ->
             SpeechPart(voices.getValue(line.speakerOrNarrator), line.speakerOrNarrator, requireNotNull(line.text))
@@ -122,11 +122,11 @@ private class Application : CliktCommand() {
             }
 
             val stream = outputs.map { AudioSystem.getAudioInputStream(it) }
-                .let {
+                .let { streams ->
                     AudioInputStream(
-                        SequenceInputStream(enumeration(it)),
-                        it.first().format,
-                        it.sumOf { it.frameLength }
+                        SequenceInputStream(enumeration(streams)),
+                        streams.first().format,
+                        streams.sumOf { it.frameLength }
                     )
                 }
             AudioSystem.write(stream, AudioFileFormat.Type.WAVE, output)
@@ -190,8 +190,8 @@ fun List<Line>.joinTexts(): List<Line> = runningReduce { acc, line ->
     else line
 }.filterIndexed { index, line -> index == lastIndex || !line.sameSpeaker(get(index + 1)) }
 
-private fun getSubtitles(timings: List<Timing>, offset: Duration) = timings.joinToString("\n") {
-    "${(it.start + offset).format()} --> ${(it.end + offset).format()}\n<v ${it.speaker}>${it.text}\n"
+fun getSubtitles(timings: List<Timing>, offset: Duration) = timings.joinToString("\n\n", prefix = "\n\n") {
+    "${(it.start + offset).format()} --> ${(it.end + offset).format()}\n<v ${it.speaker}>${it.text}"
 }
 
 private fun Duration.format() = toComponents { minutes, seconds, nanoseconds ->
