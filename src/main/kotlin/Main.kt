@@ -8,17 +8,15 @@ import com.github.ajalt.clikt.parameters.options.help
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.file
-import cz.marvincz.transcript.tts.client.*
+import cz.marvincz.transcript.tts.client.Client
+import cz.marvincz.transcript.tts.model.AzureSpeaker
+import cz.marvincz.transcript.tts.model.Expression
 import cz.marvincz.transcript.tts.model.Line
+import cz.marvincz.transcript.tts.model.SpeechPart
 import cz.marvincz.transcript.tts.model.Transcript
+import cz.marvincz.transcript.tts.utils.combineAudioFiles
 import java.io.File
-import java.io.SequenceInputStream
-import java.util.Collections.enumeration
 import java.util.Properties
-import javax.sound.sampled.AudioFileFormat
-import javax.sound.sampled.AudioInputStream
-import javax.sound.sampled.AudioSystem
-import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.json.Json
 
@@ -52,7 +50,7 @@ private class Application : CliktCommand() {
 
         val lines = transcript.lines
             .joinTexts()
-            .filter { line -> sections?.any { line.page == it.page && line.line in it.lines } != false }
+            .filter { line -> sections?.any { it.matches(line) } != false }
             .filter { it.text != null }
 
         if (lines.isEmpty()) {
@@ -101,7 +99,7 @@ private class Application : CliktCommand() {
         )
 
         val subtitleFile = File(output.path.replaceAfterLast('.', "vtt"))
-        subtitleFile.writeText("WEBVTT")
+        subtitleFile.writeText(subtitlesHeader)
 
         val chunks = lines.map { line ->
             SpeechPart(voices.getValue(line.speakerOrNarrator), line.speakerOrNarrator, requireNotNull(line.text))
@@ -121,21 +119,15 @@ private class Application : CliktCommand() {
                 chunkOutput
             }
 
-            val stream = outputs.map { AudioSystem.getAudioInputStream(it) }
-                .let { streams ->
-                    AudioInputStream(
-                        SequenceInputStream(enumeration(streams)),
-                        streams.first().format,
-                        streams.sumOf { it.frameLength }
-                    )
-                }
-            AudioSystem.write(stream, AudioFileFormat.Type.WAVE, output)
+            combineAudioFiles(outputs, output)
         } finally {
             chunks.indices.forEach { runCatching { output.chunkTempFile(it).delete() } }
         }
     }
 
-    private data class Section(val page: String, val lines: IntRange)
+    private data class Section(val page: String, val lines: IntRange) {
+        fun matches(line: Line): Boolean = line.page == page && line.line in lines
+    }
 
     private fun parseSections(value: String, optionName: String) = value.split(',').map { section ->
         val matchGroups =
@@ -155,7 +147,7 @@ private class Application : CliktCommand() {
 private fun File.chunkTempFile(index: Int) =
     File(buildString {
         append(path.substringBeforeLast('.'))
-        append("temp")
+        append(".temp")
         append(index + 1)
         append('.')
         append(path.substringAfterLast('.'))
@@ -189,14 +181,3 @@ fun List<Line>.joinTexts(): List<Line> = runningReduce { acc, line ->
     if (acc.sameSpeaker(line)) line.text?.let { acc.copy(text = "${acc.text} ${line.text}") } ?: acc
     else line
 }.filterIndexed { index, line -> index == lastIndex || !line.sameSpeaker(get(index + 1)) }
-
-fun getSubtitles(timings: List<Timing>, offset: Duration) = timings.joinToString("\n\n", prefix = "\n\n") {
-    "${(it.start + offset).format()} --> ${(it.end + offset).format()}\n<v ${it.speaker}>${it.text}"
-}
-
-private fun Duration.format() = toComponents { minutes, seconds, nanoseconds ->
-    val milliseconds = nanoseconds / 1_000_000
-    "${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${
-        milliseconds.toString().padStart(3, '0')
-    }"
-}

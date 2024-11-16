@@ -1,9 +1,9 @@
-package cz.marvincz.transcript.tts.client
+package cz.marvincz.transcript.tts.utils
 
-import kotlin.test.Test
 import org.junit.jupiter.api.Assertions
+import org.junit.jupiter.api.Test
 
-class ClientKtTest {
+class AudioUtilsTest {
     @Test
     fun `little endian 32_767`() {
         val value: Short = 32_767
