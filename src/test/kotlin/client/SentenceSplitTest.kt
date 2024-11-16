@@ -24,13 +24,13 @@ class SentenceSplitTest {
 
         val timings = getTimings(speeches, toSSML(speeches), boundaries)
 
-        assertTiming("If I may,", 50.milliseconds, 350.milliseconds, timings[0])
-        assertTiming("I’d like to refer to my notes from time to time just to keep things in --", 400.milliseconds, 3200.milliseconds, timings[1])
-        assertTiming("in line and perspective?", 3250.milliseconds, 4250.milliseconds, timings[2])
-        assertTiming("I’ve also prepared a PowerPoint presentation,", 4300.milliseconds, 6250.milliseconds, timings[3])
-        assertTiming("along with these booklets,", 6300.milliseconds, 7400.milliseconds, timings[4])
-        assertTiming("that are the same photographs as in the PowerPoint.", 7450.milliseconds, 9550.milliseconds, timings[5])
-        assertTiming("And I’d like to use these to illustrate the scene and what I documented on that day.", 9600.milliseconds, 12950.milliseconds, timings[6])
+        assertTiming("If I may,", 50.milliseconds, 400.milliseconds, timings[0])
+        assertTiming("I’d like to refer to my notes from time to time just to keep things in --", 400.milliseconds, 3250.milliseconds, timings[1])
+        assertTiming("in line and perspective?", 3250.milliseconds, 4300.milliseconds, timings[2])
+        assertTiming("I’ve also prepared a PowerPoint presentation,", 4300.milliseconds, 6300.milliseconds, timings[3])
+        assertTiming("along with these booklets,", 6300.milliseconds, 7450.milliseconds, timings[4])
+        assertTiming("that are the same photographs as in the PowerPoint.", 7450.milliseconds, 9600.milliseconds, timings[5])
+        assertTiming("And I’d like to use these to illustrate the scene and what I documented on that day.", 9600.milliseconds, 13000.milliseconds, timings[6])
     }
     
     @Test
@@ -46,16 +46,16 @@ class SentenceSplitTest {
         val timings = getTimings(speeches, ssml, boundaries2)
 
         assertTiming("Thank you,", 50.milliseconds, 625.milliseconds, timings[0])
-        assertTiming("My Lord.", 637.5.milliseconds, 1.35.seconds, timings[1])
+        assertTiming("My Lord.", 637.5.milliseconds, 1.45.seconds, timings[1])
         assertTiming("I’m just going to start --", 1.7.seconds, 3.225.seconds, timings[2])
-        assertTiming("open up my laptop here.", 3.2375.seconds, 4.525.seconds, timings[3])
-        assertTiming("Yes.", 4.875.seconds, 5.5.seconds, timings[4])
-        assertTiming("You go ahead.", 5.8375.seconds, 6.4625.seconds, timings[5])
-        assertTiming("While he’s doing that,", 6.8.seconds, 7.825.seconds, timings[6])
-        assertTiming("I’ll just say that we’re going to sit until about 11:15.", 8.2375.seconds, 11.4875.seconds, timings[7])
-        assertTiming("Around 11:15,", 11.825.seconds, 13.25.seconds, timings[8])
-        assertTiming("we’ll take a 15-minute break.", 13.6125.seconds, 15.2625.seconds, timings[9])
-        assertTiming("So just so you know how long you’re going to have to be sitting there.", 15.6.seconds, 18.2875.seconds, timings[10])
+        assertTiming("open up my laptop here.", 3.2375.seconds, 4.625.seconds, timings[3])
+        assertTiming("Yes.", 4.875.seconds, 5.5875.seconds, timings[4])
+        assertTiming("You go ahead.", 5.8375.seconds, 6.55.seconds, timings[5])
+        assertTiming("While he’s doing that,", 6.8.seconds, 8.2375.seconds, timings[6])
+        assertTiming("I’ll just say that we’re going to sit until about 11:15.", 8.2375.seconds, 11.575.seconds, timings[7])
+        assertTiming("Around 11:15,", 11.825.seconds, 13.6125.seconds, timings[8])
+        assertTiming("we’ll take a 15-minute break.", 13.6125.seconds, 15.35.seconds, timings[9])
+        assertTiming("So just so you know how long you’re going to have to be sitting there.", 15.6.seconds, 18.375.seconds, timings[10])
     }
 
     private fun assertTiming(expectedText: String, expectedStart: Duration, expectedEnd: Duration, timing: Timing) {
