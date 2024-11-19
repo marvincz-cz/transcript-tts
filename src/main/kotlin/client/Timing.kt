@@ -20,7 +20,10 @@ fun getTimings(speeches: List<SpeechPart>, ssml: String, boundaries: List<Bounda
             index = ssml.indexOf(xmlSentence, index + 1)
 
             val start = boundaries.firstOrNull { it.textOffset == index }?.offset ?: wipTiming?.start
-            val end = boundaries.firstOrNull { it.textOffset == index + xmlSentence.length - 1 }?.endOffset
+            val end = boundaries.firstOrNull {
+                it.textOffset == index + xmlSentence.length - 1
+                        || it.textOffset + it.text.length == index + xmlSentence.length
+            }?.endOffset
 
             val timing = wipTiming.join(Timing(speaker, sentence, start ?: 0.milliseconds, end ?: 0.milliseconds))
             wipTiming = null
