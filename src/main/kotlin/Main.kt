@@ -139,7 +139,7 @@ private class Application : CliktCommand() {
 
         Section(
             page = page,
-            lines = lineFrom?.let { IntRange(it, lineTo ?: lineFrom) } ?: IntRange(-Int.MIN_VALUE, Int.MAX_VALUE)
+            lines = lineFrom?.let { IntRange(it, lineTo ?: lineFrom) } ?: IntRange(Int.MIN_VALUE, Int.MAX_VALUE)
         )
     }
 }
