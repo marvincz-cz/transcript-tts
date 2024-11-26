@@ -6,7 +6,7 @@ fun toSSML(speeches: List<SpeechPart>) = buildString {
     append("<speak version=\"1.0\" xmlns=\"https://www.w3.org/2001/10/synthesis\" xmlns:mstts=\"https://www.w3.org/2001/mstts\" xml:lang=\"en-CA\">")
 
     speeches.forEach { speech ->
-        val text = speech.text.fixTexts()
+        val text = speech.text.fixForXml()
         append("<voice name=\"${speech.speaker.voiceId}\">")
         speech.speaker.expression?.let { expression ->
             append("<mstts:express-as style=\"${expression.style}\"")
@@ -23,8 +23,9 @@ fun toSSML(speeches: List<SpeechPart>) = buildString {
     append("</speak>")
 }
 
-fun String.fixTexts() = escapeXml()
+fun String.fixForXml() = escapeXml()
     .replace("[sic]", "")
+    .replace("(sic)", "")
     .replace("(NO AUDIBLE RESPONSE)", "<mstts:silence type=\"Leading-exact\" value=\"2s\" />")
 
 private fun String.escapeXml() =
@@ -33,3 +34,10 @@ private fun String.escapeXml() =
         .replace("'", "&apos;")
         .replace("<", "&lt;")
         .replace(">", "&gt;")
+
+fun String.unescapeXml() =
+    replace("&quot;", "\"")
+        .replace("&amp;", "&")
+        .replace("&apos;", "'")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")

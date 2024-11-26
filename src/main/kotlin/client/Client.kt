@@ -49,8 +49,10 @@ class Client(subscriptionKey: String, region: String) {
 
         return TtsResult(
             audioData = result.audioData.muteIndiscernible(boundaries, format),
-            boundaries = boundaries,
-            timings = getTimings(speeches, ssml, boundaries),
+            timings = getTimingsFromSpeech(speeches, ssml, boundaries.mapIndexed { index, boundary ->
+                if (index != boundaries.lastIndex) boundary.withPauseTo(boundaries[index + 1])
+                else boundary
+            }),
             duration = correctDuration,
         )
     }
@@ -95,7 +97,6 @@ class Client(subscriptionKey: String, region: String) {
 
     class TtsResult(
         val audioData: ByteArray,
-        val boundaries: MutableList<Boundary>,
         val timings: List<Timing>,
         val duration: Duration,
     )

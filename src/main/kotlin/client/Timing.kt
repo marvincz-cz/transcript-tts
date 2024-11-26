@@ -1,5 +1,6 @@
 package cz.marvincz.transcript.tts.client
 
+import com.microsoft.cognitiveservices.speech.SpeechSynthesisBoundaryType
 import cz.marvincz.transcript.tts.model.Boundary
 import cz.marvincz.transcript.tts.model.SpeechPart
 import kotlin.math.max
@@ -16,14 +17,11 @@ fun getTimings(speeches: List<SpeechPart>, ssml: String, boundaries: List<Bounda
         val timings = mutableListOf<Timing>()
         var wipTiming: Timing? = null
         sentences.forEach { sentence ->
-            val xmlSentence = sentence.fixTexts()
+            val xmlSentence = sentence.fixForXml()
             index = ssml.indexOf(xmlSentence, index + 1)
 
             val start = boundaries.firstOrNull { it.textOffset == index }?.offset ?: wipTiming?.start
-            val end = boundaries.firstOrNull {
-                it.textOffset == index + xmlSentence.length - 1
-                        || it.textOffset + it.text.length == index + xmlSentence.length
-            }?.endOffset
+            val end = boundaries.firstOrNull { it.textOffset + it.text.length == index + xmlSentence.length }?.endOffset
 
             val timing = wipTiming.join(Timing(speaker, sentence, start ?: 0.milliseconds, end ?: 0.milliseconds))
             wipTiming = null
@@ -47,6 +45,53 @@ fun getTimings(speeches: List<SpeechPart>, ssml: String, boundaries: List<Bounda
 
         return@flatMap timings
     }
+}
+
+fun getTimingsFromSpeech(speeches: List<SpeechPart>, ssml: String, boundaries: List<Boundary>): List<Timing> {
+    val splits = boundaries.filterIndexed { index, it ->
+        it.pause > 120.milliseconds
+                || (it.type == SpeechSynthesisBoundaryType.Punctuation && it.duration > 210.milliseconds)
+                || index == boundaries.lastIndex
+    }.map {
+        var index = boundaries.indexOf(it)
+        while (index < boundaries.lastIndex && boundaries[index + 1].type == SpeechSynthesisBoundaryType.Punctuation) {
+            index++
+        }
+        boundaries[index]
+    }
+
+    val timings = mutableListOf<Timing>()
+    var index = 0
+    speeches.forEach { speech ->
+        val xmlText = speech.text.fixForXml()
+        index = ssml.indexOf(xmlText, index)
+        val endIndex = index + xmlText.length
+
+        var speechIndex = 0
+        var start = boundaries.first { it.textOffset >= index }
+        splits.filter { it.textOffset in index ..endIndex }.forEach { split ->
+            val xmlSentence = ssml.substring(index, split.textOffset + split.text.length).unescapeXml()
+
+            val regex = xmlSentence.split(Regex("\\s"))
+                .joinToString(separator = "\\s+((\\(|\\[)sic(\\)|\\])\\s*)?") { Regex.escape(it) }.toRegex()
+            val match = regex.find(speech.text, speechIndex)!!
+
+            timings.add(Timing(
+                speaker = speech.speakerName,
+                text = match.value.trim(),
+                start = start.offset,
+                end = split.endOffset
+            ))
+
+            start = boundaries.find { it.textOffset > split.textOffset } ?: start
+            index = start.textOffset
+            speechIndex = match.range.last + 1
+        }
+
+        // TODO some fallback if still speechIndex < speech.text.length
+    }
+
+    return timings
 }
 
 fun getSentences(speech: SpeechPart): List<String> {
