@@ -7,17 +7,20 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.nanoseconds
 
 
+@Serializable
 data class AzureSpeaker(
     val voiceId: String,
     val expression: Expression? = null,
 )
 
+@Serializable
 data class Expression(
     val style: String = "neutral",
     val role: String? = null,
     val styleDegree: Float? = null,
 )
 
+@Serializable
 data class SpeechPart(
     val speaker: AzureSpeaker,
     val speakerName: String,
@@ -41,8 +44,9 @@ data class Boundary(
         e.textOffset.toInt(),
     )
 
-    val endOffset
-        get() = offset + duration
+    val endOffset = offset + duration
+
+    val textEndOffset = textOffset + text.length
 
     fun withPauseTo(next: Boundary) = copy(pause = next.offset - endOffset)
 }

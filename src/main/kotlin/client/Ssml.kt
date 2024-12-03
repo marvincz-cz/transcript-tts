@@ -26,7 +26,7 @@ fun toSSML(speeches: List<SpeechPart>) = buildString {
 fun String.fixForXml() = escapeXml()
     .replace("[sic]", "")
     .replace("(sic)", "")
-    .replace("(NO AUDIBLE RESPONSE)", "<mstts:silence type=\"Leading-exact\" value=\"2s\" />")
+    .replace("(NO AUDIBLE RESPONSE)", "(NO-AUDIBLE-RESPONSE)")
 
 private fun String.escapeXml() =
     replace("\"", "&quot;")
@@ -35,7 +35,10 @@ private fun String.escapeXml() =
         .replace("<", "&lt;")
         .replace(">", "&gt;")
 
-fun String.unescapeXml() =
+fun String.recoverFromXml() = unescapeXml()
+    .replace("(NO-AUDIBLE-RESPONSE)", "(NO AUDIBLE RESPONSE)")
+
+private fun String.unescapeXml() =
     replace("&quot;", "\"")
         .replace("&amp;", "&")
         .replace("&apos;", "'")

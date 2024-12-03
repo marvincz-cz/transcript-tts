@@ -21,7 +21,7 @@ fun getTimings(speeches: List<SpeechPart>, ssml: String, boundaries: List<Bounda
             index = ssml.indexOf(xmlSentence, index + 1)
 
             val start = boundaries.firstOrNull { it.textOffset == index }?.offset ?: wipTiming?.start
-            val end = boundaries.firstOrNull { it.textOffset + it.text.length == index + xmlSentence.length }?.endOffset
+            val end = boundaries.firstOrNull { it.textEndOffset == index + xmlSentence.length }?.endOffset
 
             val timing = wipTiming.join(Timing(speaker, sentence, start ?: 0.milliseconds, end ?: 0.milliseconds))
             wipTiming = null
@@ -47,53 +47,156 @@ fun getTimings(speeches: List<SpeechPart>, ssml: String, boundaries: List<Bounda
     }
 }
 
-fun getTimingsFromSpeech(speeches: List<SpeechPart>, ssml: String, boundaries: List<Boundary>): List<Timing> {
-    val splits = boundaries.filterIndexed { index, it ->
-        it.pause > 120.milliseconds
-                || (it.type == SpeechSynthesisBoundaryType.Punctuation && it.duration > 210.milliseconds)
-                || index == boundaries.lastIndex
-    }.map {
-        var index = boundaries.indexOf(it)
-        while (index < boundaries.lastIndex && boundaries[index + 1].type == SpeechSynthesisBoundaryType.Punctuation) {
-            index++
-        }
-        boundaries[index]
-    }
+private val BASE_PAUSE = 12.5.milliseconds
+private const val INITIAL_PAUSE_FACTOR = 21
 
-    val timings = mutableListOf<Timing>()
+fun getTimingsFromSpeech(speeches: List<SpeechPart>, ssml: String, boundaries: List<Boundary>): List<Timing> {
     var index = 0
-    speeches.forEach { speech ->
+    return speeches.flatMap { speech ->
         val xmlText = speech.text.fixForXml()
         index = ssml.indexOf(xmlText, index)
         val endIndex = index + xmlText.length
 
-        var speechIndex = 0
-        var start = boundaries.first { it.textOffset >= index }
-        splits.filter { it.textOffset in index ..endIndex }.forEach { split ->
-            val xmlSentence = ssml.substring(index, split.textOffset + split.text.length).unescapeXml()
-
-            val regex = xmlSentence.split(Regex("\\s"))
-                .joinToString(separator = "\\s+((\\(|\\[)sic(\\)|\\])\\s*)?") { Regex.escape(it) }.toRegex()
-            val match = regex.find(speech.text, speechIndex)!!
-
-            timings.add(Timing(
-                speaker = speech.speakerName,
-                text = match.value.trim(),
-                start = start.offset,
-                end = split.endOffset
-            ))
-
-            start = boundaries.find { it.textOffset > split.textOffset } ?: start
-            index = start.textOffset
-            speechIndex = match.range.last + 1
-        }
-
-        // TODO some fallback if still speechIndex < speech.text.length
+        joinShortTimings(
+            buildList {
+                index = splitSpeech(
+                    speechText = speech.text,
+                    speaker = speech.speakerName,
+                    ssml = ssml,
+                    boundaries = boundaries.filter { it.textOffset in index .. endIndex }.addPunctuationToPause(),
+                    startIndex = index,
+                    pauseFactor = INITIAL_PAUSE_FACTOR,
+                )
+            }
+        )
     }
-
-    return timings
 }
 
+private fun MutableList<Timing>.splitSpeech(
+    speechText: String,
+    speaker: String,
+    ssml: String,
+    boundaries: List<Boundary>,
+    startIndex: Int,
+    pauseFactor: Int,
+): Int {
+    val splits = boundaries.findSplits(pauseFactor)
+
+    var index = startIndex
+    var speechIndex = 0
+    var start = boundaries.first()
+    splits.forEach { split ->
+        val xmlSentence = ssml.substring(index, split.textOffset + split.text.length).recoverFromXml()
+
+        val regex = xmlSentence.split(Regex("\\s"))
+            .joinToString(separator = "\\s+(?:(?:\\(|\\[)[\\w\\s]+(?:\\)|\\])\\s*)?") { Regex.escape(it) }.toRegex()
+        val match = regex.find(speechText, speechIndex)!!
+
+        val text = match.value.trim()
+        if (text.length <= 85 || pauseFactor == 2) {
+            add(
+                Timing(
+                    speaker = speaker,
+                    text = text,
+                    start = start.offset,
+                    end = split.endOffset,
+                    pause = split.pause,
+                )
+            )
+        } else {
+            splitSpeech(
+                speechText = text,
+                speaker = speaker,
+                ssml = ssml,
+                boundaries = boundaries.filter { it.textOffset in start.textOffset..split.textOffset },
+                startIndex = index,
+                pauseFactor = pauseFactor - 1
+            )
+        }
+
+        start = boundaries.find { it.textOffset > split.textOffset } ?: split
+        index = start.textOffset
+        speechIndex = match.range.last + 1
+    }
+
+    // TODO some fallback if still speechIndex < speech.text.length
+    return index
+}
+
+/**
+ * We find boundaries with pause longer than a specified minimum pause.
+ * If a word is followed by punctuation, we take the last punctuation as the "split" point,
+ * but because of the way [addPunctuationToPause] works, the total pause is on the word, so we use that.
+ */
+private fun List<Boundary>.findSplits(pauseFactor: Int): List<Boundary> {
+    val minPause = BASE_PAUSE * pauseFactor
+
+    return filterIndexed { index, it -> it.pause >= minPause || index == lastIndex }
+        .map {
+            var index = indexOf(it)
+            while (index < lastIndex && this[index + 1].type == SpeechSynthesisBoundaryType.Punctuation) {
+                index++
+            }
+            this[index].copy(pause = it.pause)
+        }.distinctBy { it.textOffset }
+}
+
+/**
+ * The total actual "pause" after a word that is followed by punctuation can be split into multiple values:
+ * * pause at the end of the last word
+ * * duration of the punctuation
+ * * pause at the end of the punctuation
+ *
+ * If there are more than one punctuation Boundaries after the word, we sum the duration and pause for all of them.
+ */
+private fun List<Boundary>.addPunctuationToPause() = mapIndexed { index, boundary ->
+    var pause = boundary.pause
+    if (boundary.type == SpeechSynthesisBoundaryType.Punctuation) pause += boundary.duration
+
+    var i = index
+    while (i < lastIndex && this[i + 1].type == SpeechSynthesisBoundaryType.Punctuation) {
+        i++
+        pause += this[i].duration + this[i].pause
+    }
+    boundary.copy(pause = pause)
+}
+
+private fun joinShortTimings(timings: List<Timing>): List<Timing> {
+    if (timings.size == 1) return timings
+
+    var joined: Boolean
+    var list = timings
+
+    do {
+        joined = false
+
+        val fitness = list.mapIndexedNotNull { index, timing ->
+            if (index < list.lastIndex) {
+                timing.joinFitness(list[index + 1])
+            } else null
+        }
+
+        val minFitness = fitness.minOrNull() ?: break
+        val index = fitness.indexOf(minFitness)
+
+        if (minFitness < 15000 && list[index].joinedLength(list[index + 1]) < 40) {
+            list = buildList {
+                if (index > 0) addAll(list.subList(0, index))
+                add(list[index].join(list[index + 1]))
+                if (index < list.lastIndex - 1) addAll(list.subList(index + 2, list.size))
+            }
+            joined = true
+        }
+    } while (joined && list.size > 1)
+
+    return list
+}
+
+/**
+ * First pass: Split text by punctuation
+ * Second pass: Join very short "sentences" on one line
+ * Third pass: Split very long unbroken "sentences"
+ */
 fun getSentences(speech: SpeechPart): List<String> {
     val sentences = sentenceRegex.findAll(speech.text).map { it.groups[1]!!.value }.toList()
 
@@ -170,25 +273,35 @@ data class Timing(
     val text: String,
     val start: Duration,
     val end: Duration,
+    val pause: Duration = 0.milliseconds,
 ) {
     fun join(other: Timing): Timing {
         require(speaker == other.speaker) { "Only lines from the same speaker can be joined for timing" }
         return copy(
             text = "$text ${other.text}",
             end = other.end,
+            pause = other.pause,
         )
     }
 }
 
 private fun Timing?.join(other: Timing): Timing = this?.join(other) ?: other
 
+private fun Timing.joinFitness(other: Timing) = joinedLength(other) * (pause.inWholeMilliseconds + 100) * text.separatorFitnessWeight()
+
+private fun Timing.joinedLength(other: Timing) = text.length + other.text.length + 1
+
 private fun String.joinFitness(other: String) = joinedLength(other) * separatorFitnessWeight()
 
 private fun String.joinedLength(other: String) = length + other.length + 1
 
+/**
+ * We prefer to join lines in some places as opposed to others
+ */
 private fun String.separatorFitnessWeight() = when {
     endsWith(',') -> 0.7
-    last() in listOf('&', '\'', '%', '*') -> 0.2
+    last() in listOf('&', '\'', '%', '*') -> 0.4
+    last().isLetterOrDigit() -> 0.4
     endsWith(';') -> 0.8
     endsWith("--") -> 1.2
     else -> 1.0
@@ -196,7 +309,6 @@ private fun String.separatorFitnessWeight() = when {
 
 private val notSeparators = listOf("Mr", "Mrs", "Ms", "Dr").joinToString("") { "(?<!$it)" }
 private val sentenceRegex = Regex("\\s*(.+?$notSeparators(?<separator>\\p{Po}|--|$))(?> |$)")
-
 
 private const val minSplitSentenceLength = 20
 // mostly conjunctions

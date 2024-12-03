@@ -29,11 +29,7 @@ class Client(subscriptionKey: String, region: String) {
         val speechSynthesizer = SpeechSynthesizer(speechConfig, null)
 
         val boundaries = mutableListOf<Boundary>()
-        speechSynthesizer.WordBoundary.addEventListener { _, e ->
-            val boundary = Boundary(e)
-            boundaries.add(boundary)
-            println(boundary)
-        }
+        speechSynthesizer.WordBoundary.addEventListener { _, e -> boundaries.add(Boundary(e)) }
 
         val result = speechSynthesizer.SpeakSsml(ssml)
 
@@ -91,7 +87,7 @@ class Client(subscriptionKey: String, region: String) {
 
     private fun ByteArray.muteIndiscernible(boundaries: List<Boundary>, format: AudioFormat) = apply {
         for (boundary in boundaries) {
-            if (boundary.text == "INDISCERNIBLE") muteSection(format, boundary.offset, boundary.endOffset)
+            if (boundary.text in listOf("INDISCERNIBLE", "NO-AUDIBLE-RESPONSE")) muteSection(format, boundary.offset, boundary.endOffset)
         }
     }
 
