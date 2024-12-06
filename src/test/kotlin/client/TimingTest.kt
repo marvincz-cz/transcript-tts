@@ -6,69 +6,59 @@ import cz.marvincz.transcript.tts.model.SpeechPart
 import cz.marvincz.transcript.tts.subtitlesHeader
 import cz.marvincz.transcript.tts.timing.TextBasedTimingGenerator
 import cz.marvincz.transcript.tts.timing.Timing
+import cz.marvincz.transcript.tts.timing.TimingGenerator
 import cz.marvincz.transcript.tts.timing.VoiceBasedTimingGenerator
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.decodeFromStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Duration
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromStream
 
 @OptIn(ExperimentalSerializationApi::class)
 class TimingTest {
     @Test
-    fun testGetTimings() {
+    fun testTimings() {
         // T105:29-32
-        val speeches = loadResourceAndDeserialize<List<SpeechPart>>("client/testSpeeches.json")
-
-        val boundaries = loadResourceAndDeserialize<List<Boundary>>("client/testBoundaries.json")
-
-        val timings = TextBasedTimingGenerator().getTimings(speeches, toSSML(speeches), boundaries)
-
-        val expected = loadResourceAsString("client/testExpected.vtt")
-        assertEquals(expected, getSubtitles(timings))
+        testTiming(
+            timingGenerator = TextBasedTimingGenerator(),
+            speechesResource = "client/testSpeeches.json",
+            boundariesResource = "client/testBoundaries.json",
+            expectedResource = "client/testExpected.vtt",
+        )
     }
 
     @Test
     fun testTiming2() {
         // T106:4-10
-        val speeches = loadResourceAndDeserialize<List<SpeechPart>>("client/test2Speeches.json")
-        val ssml = toSSML(speeches)
-
-        val boundaries = loadResourceAndDeserialize<List<Boundary>>("client/test2Boundaries.json")
-
-        val timings = TextBasedTimingGenerator().getTimings(speeches, ssml, boundaries)
-
-        val expected = loadResourceAsString("client/test2Expected.vtt")
-        assertEquals(expected, getSubtitles(timings))
+        testTiming(
+            timingGenerator = TextBasedTimingGenerator(),
+            speechesResource = "client/test2Speeches.json",
+            boundariesResource = "client/test2Boundaries.json",
+            expectedResource = "client/test2Expected.vtt",
+        )
     }
 
     @Test
     fun textOpening() {
         // T100:3-41,T101,T102:1-37
-        val speeches = loadResourceAndDeserialize<List<SpeechPart>>("client/openingSpeeches.json")
-        val ssml = toSSML(speeches)
-
-        val boundaries = loadResourceAndDeserialize<List<Boundary>>("client/openingBoundaries.json")
-
-        val timings = VoiceBasedTimingGenerator().getTimings(speeches, ssml, boundaries)
-
-        val expected = loadResourceAsString("client/openingExpected.vtt")
-        assertEquals(expected, getSubtitles(timings))
+        testTiming(
+            timingGenerator = VoiceBasedTimingGenerator(),
+            speechesResource = "client/openingSpeeches.json",
+            boundariesResource = "client/openingBoundaries.json",
+            expectedResource = "client/openingExpected.vtt",
+        )
     }
 
     @Test
     fun testIndiscernible() {
         // T106:12-29
-        val speeches = loadResourceAndDeserialize<List<SpeechPart>>("client/indiscernibleSpeeches.json")
-        val ssml = toSSML(speeches)
-
-        val boundaries = loadResourceAndDeserialize<List<Boundary>>("client/indiscernibleBoundaries.json")
-
-        val timings = VoiceBasedTimingGenerator().getTimings(speeches, ssml, boundaries)
-
-        val expected = loadResourceAsString("client/indiscernibleExpected.vtt")
-        assertEquals(expected, getSubtitles(timings))
+        testTiming(
+            timingGenerator = VoiceBasedTimingGenerator(),
+            speechesResource = "client/indiscernibleSpeeches.json",
+            boundariesResource = "client/indiscernibleBoundaries.json",
+            expectedResource = "client/indiscernibleExpected.vtt",
+        )
     }
 
     /**
@@ -77,15 +67,28 @@ class TimingTest {
     @Test
     fun testNoAudibleResponse() {
         // T69:7-22
-        val speeches = loadResourceAndDeserialize<List<SpeechPart>>("client/noAudibleSpeeches.json")
+        testTiming(
+            timingGenerator = VoiceBasedTimingGenerator(),
+            speechesResource = "client/noAudibleSpeeches.json",
+            boundariesResource = "client/noAudibleBoundaries.json",
+            expectedResource = "client/noAudibleExpected.vtt"
+        )
+    }
+
+    private fun testTiming(
+        timingGenerator: TimingGenerator,
+        speechesResource: String,
+        boundariesResource: String,
+        expectedResource: String,
+    ) {
+        val speeches = loadResourceAndDeserialize<List<SpeechPart>>(speechesResource)
         val ssml = toSSML(speeches)
 
-        val boundaries =
-            Json.decodeFromStream<List<Boundary>>(javaClass.classLoader.getResourceAsStream("client/noAudibleBoundaries.json")!!)
+        val boundaries = loadResourceAndDeserialize<List<Boundary>>(boundariesResource)
 
-        val timings = VoiceBasedTimingGenerator().getTimings(speeches, ssml, boundaries)
+        val timings = timingGenerator.getTimings(speeches, ssml, boundaries)
 
-        val expected = loadResourceAsString("client/noAudibleExpected.vtt")
+        val expected = loadResourceAsString(expectedResource)
         assertEquals(expected, getSubtitles(timings))
     }
 
