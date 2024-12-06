@@ -10,15 +10,16 @@ import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.file
 import cz.marvincz.transcript.tts.client.Client
 import cz.marvincz.transcript.tts.model.AzureSpeaker
-import cz.marvincz.transcript.tts.model.Expression
+import cz.marvincz.transcript.tts.model.ExtraVoices
 import cz.marvincz.transcript.tts.model.Line
 import cz.marvincz.transcript.tts.model.SpeechPart
 import cz.marvincz.transcript.tts.model.Transcript
+import cz.marvincz.transcript.tts.model.VoiceLibrary
 import cz.marvincz.transcript.tts.utils.combineAudioFiles
+import cz.marvincz.transcript.tts.utils.json
 import java.io.File
 import java.util.Properties
 import kotlin.time.Duration.Companion.milliseconds
-import kotlinx.serialization.json.Json
 
 fun main(args: Array<String>) = Application().main(args)
 
@@ -29,6 +30,8 @@ private class Application : CliktCommand() {
 
     private val transcript: File by option().file(mustExist = true, canBeDir = false, mustBeReadable = true).required()
         .help { "The transcript JSON file" }
+    private val voices: File by option().file(mustExist = true, canBeDir = false, mustBeReadable = true).required()
+        .help { "The voice library" } // TODO describe format
     private val output: File by option().file(canBeDir = false).required()
         .help { "The output file where the generated audio will be written" }
     private val azureProperties: File by option().file(mustExist = true, canBeDir = false, mustBeReadable = true)
@@ -45,8 +48,8 @@ private class Application : CliktCommand() {
         }
 
     override fun run() {
-        val json = transcript.readText()
-        val transcript = Json.decodeFromString<Transcript>(json)
+        val transcript = json.decodeFromString<Transcript>(transcript.readText())
+        val voiceLibrary = json.decodeFromString<VoiceLibrary>(voices.readText())
 
         val lines = transcript.lines
             .joinTexts()
@@ -58,38 +61,18 @@ private class Application : CliktCommand() {
             return
         }
 
-        // TODO: Voices as a parameter
-        val jurorVoices = listOf(
-            AzureSpeaker("en-US-AmandaMultilingualNeural"),
-            AzureSpeaker("zh-CN-XiaoyuMultilingualNeural"),
-            AzureSpeaker("it-IT-GiuseppeMultilingualNeural"),
-            AzureSpeaker("pt-BR-MacerioMultilingualNeural"),
-            AzureSpeaker("zh-CN-XiaochenMultilingualNeural"),
-            AzureSpeaker("en-US-SteffanMultilingualNeural"),
-        )
-        val jurors = transcript.speakers.filter { it.startsWith("JUROR") }
+        val voices = voiceLibrary.voices + mapExtraVoicesToSpeakers(voiceLibrary, transcript)
 
-        val voices = mapOf(
-            "THE COURT" to AzureSpeaker("en-US-LewisMultilingualNeural"),
-            "THE COURT CLERK" to AzureSpeaker(
-                "en-US-SerenaMultilingualNeural",
-                expression = Expression(style = "serious")
-            ),
-            "MR. BURGE" to AzureSpeaker("en-US-AdamMultilingualNeural"),
-            "MR. SPENCER" to AzureSpeaker("en-US-DerekMultilingualNeural"),
-            "CORPORAL HEROUX" to AzureSpeaker("en-US-DustinMultilingualNeural"),
-            "SERGEANT BARNES" to AzureSpeaker("en-US-NovaTurboMultilingualNeural"),
-            "MR. BROWNE" to AzureSpeaker("en-US-RyanMultilingualNeural"),
-            "NARRATOR" to AzureSpeaker("en-US-AlloyTurboMultilingualNeural"),
-            "THE ACCUSED" to AzureSpeaker("en-US-DavisMultilingualNeural"),
-            "MR. GILLANDERS" to AzureSpeaker("en-US-SamuelMultilingualNeural"),
-            "THE SHERIFF" to AzureSpeaker("en-US-DavisMultilingualNeural"),
-            "MR. BRUCE" to AzureSpeaker("en-US-DavisMultilingualNeural"),
-            "UNIDENTIFIED SPEAKER" to AzureSpeaker("en-US-ChristopherMultilingualNeural"),
-        ) + jurors.mapIndexed { index, juror -> juror to jurorVoices[index % jurorVoices.size] }
-
-        val missingVoices = lines.mapTo(mutableSetOf(), Line::speakerOrNarrator).filter { it !in voices }
+        val missingVoices = lines.mapTo(mutableSetOf(), Line::speakerOrNarrator).filter { speaker ->
+            speaker !in voices && voiceLibrary.extras.none {
+                it.assignment == ExtraVoices.AssignmentType.LineRoundRobin && it.speakerRegex.matches(speaker)
+            }
+        }
         require(missingVoices.isEmpty()) { "Missing TTS voices for speakers: $missingVoices" }
+
+        val extraVoicesByLine = voiceLibrary.extras
+            .filter { it.assignment == ExtraVoices.AssignmentType.LineRoundRobin }
+            .map(::ExtraVoicesByLineTracker)
 
         val properties = Properties().apply { load(azureProperties.inputStream()) }
 
@@ -102,10 +85,12 @@ private class Application : CliktCommand() {
         subtitleFile.writeText(subtitlesHeader)
 
         val chunks = lines.map { line ->
-            SpeechPart(voices.getValue(line.speakerOrNarrator), line.speakerOrNarrator, requireNotNull(line.text))
+            val speakerName = line.speakerOrNarrator
+            val speaker = voices[speakerName] ?: extraVoicesByLine.first { it.matches(speakerName) }[speakerName]
+            SpeechPart(speaker, speakerName, requireNotNull(line.text))
         }.splitToChunks()
-        var chunkOffset = 0.milliseconds
 
+        var chunkOffset = 0.milliseconds
         try {
             val outputs = chunks.mapIndexed { index, chunk ->
                 println("Generating chunk ${index + 1}")
@@ -141,6 +126,35 @@ private class Application : CliktCommand() {
             page = page,
             lines = lineFrom?.let { IntRange(it, lineTo ?: lineFrom) } ?: IntRange(Int.MIN_VALUE, Int.MAX_VALUE)
         )
+    }
+
+    private fun mapExtraVoicesToSpeakers(
+        voiceLibrary: VoiceLibrary,
+        transcript: Transcript,
+    ): List<Pair<String, AzureSpeaker>> =
+        voiceLibrary.extras.filter { it.assignment == ExtraVoices.AssignmentType.SpeakerRoundRobin }
+            .flatMap { extra ->
+                val speakers = transcript.speakers.filter { extra.speakerRegex.matches(it) }
+                speakers.mapIndexed { index, speaker -> speaker to extra.voices[index % extra.voices.size] }
+            }
+
+    private data class ExtraVoicesByLineTracker(
+        val extra: ExtraVoices,
+        var index: Int = 0,
+        var lastSpeaker: String? = null,
+    ) {
+        fun matches(speaker: String) = extra.speakerRegex.matches(speaker)
+
+        operator fun get(speaker: String) : AzureSpeaker {
+            require(matches(speaker))
+
+            if (lastSpeaker != speaker && lastSpeaker != null) {
+                index = (index + 1) % extra.voices.size
+            }
+            lastSpeaker = speaker
+
+            return extra.voices[index]
+        }
     }
 }
 

@@ -8,11 +8,11 @@ import cz.marvincz.transcript.tts.timing.TextBasedTimingGenerator
 import cz.marvincz.transcript.tts.timing.Timing
 import cz.marvincz.transcript.tts.timing.TimingGenerator
 import cz.marvincz.transcript.tts.timing.VoiceBasedTimingGenerator
+import cz.marvincz.transcript.tts.utils.json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Duration
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromStream
 
 @OptIn(ExperimentalSerializationApi::class)
@@ -95,7 +95,7 @@ class TimingTest {
     private fun getSubtitles(timings: List<Timing>) = "$subtitlesHeader${getSubtitles(timings, Duration.ZERO)}"
 
     private inline fun <reified T> loadResourceAndDeserialize(name: String) =
-        Json.decodeFromStream<T>(javaClass.classLoader.getResourceAsStream(name)!!)
+        json.decodeFromStream<T>(javaClass.classLoader.getResourceAsStream(name)!!)
 
     private fun loadResourceAsString(name: String) =
         javaClass.classLoader.getResourceAsStream(name)!!.reader().use { it.readText() }
