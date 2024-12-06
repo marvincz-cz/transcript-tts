@@ -1,6 +1,6 @@
 package cz.marvincz.transcript.tts
 
-import cz.marvincz.transcript.tts.client.Timing
+import cz.marvincz.transcript.tts.timing.Timing
 import kotlin.time.Duration
 
 

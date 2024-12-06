@@ -4,6 +4,9 @@ import cz.marvincz.transcript.tts.getSubtitles
 import cz.marvincz.transcript.tts.model.Boundary
 import cz.marvincz.transcript.tts.model.SpeechPart
 import cz.marvincz.transcript.tts.subtitlesHeader
+import cz.marvincz.transcript.tts.timing.TextBasedTimingGenerator
+import cz.marvincz.transcript.tts.timing.Timing
+import cz.marvincz.transcript.tts.timing.VoiceBasedTimingGenerator
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromStream
@@ -20,7 +23,7 @@ class TimingTest {
 
         val boundaries = loadResourceAndDeserialize<List<Boundary>>("client/testBoundaries.json")
 
-        val timings = getTimings(speeches, toSSML(speeches), boundaries)
+        val timings = TextBasedTimingGenerator().getTimings(speeches, toSSML(speeches), boundaries)
 
         val expected = loadResourceAsString("client/testExpected.vtt")
         assertEquals(expected, getSubtitles(timings))
@@ -34,7 +37,7 @@ class TimingTest {
 
         val boundaries = loadResourceAndDeserialize<List<Boundary>>("client/test2Boundaries.json")
 
-        val timings = getTimings(speeches, ssml, boundaries)
+        val timings = TextBasedTimingGenerator().getTimings(speeches, ssml, boundaries)
 
         val expected = loadResourceAsString("client/test2Expected.vtt")
         assertEquals(expected, getSubtitles(timings))
@@ -48,7 +51,7 @@ class TimingTest {
 
         val boundaries = loadResourceAndDeserialize<List<Boundary>>("client/openingBoundaries.json")
 
-        val timings = getTimingsFromSpeech(speeches, ssml, boundaries)
+        val timings = VoiceBasedTimingGenerator().getTimings(speeches, ssml, boundaries)
 
         val expected = loadResourceAsString("client/openingExpected.vtt")
         assertEquals(expected, getSubtitles(timings))
@@ -62,7 +65,7 @@ class TimingTest {
 
         val boundaries = loadResourceAndDeserialize<List<Boundary>>("client/indiscernibleBoundaries.json")
 
-        val timings = getTimingsFromSpeech(speeches, ssml, boundaries)
+        val timings = VoiceBasedTimingGenerator().getTimings(speeches, ssml, boundaries)
 
         val expected = loadResourceAsString("client/indiscernibleExpected.vtt")
         assertEquals(expected, getSubtitles(timings))
@@ -80,7 +83,7 @@ class TimingTest {
         val boundaries =
             Json.decodeFromStream<List<Boundary>>(javaClass.classLoader.getResourceAsStream("client/noAudibleBoundaries.json")!!)
 
-        val timings = getTimingsFromSpeech(speeches, ssml, boundaries)
+        val timings = VoiceBasedTimingGenerator().getTimings(speeches, ssml, boundaries)
 
         val expected = loadResourceAsString("client/noAudibleExpected.vtt")
         assertEquals(expected, getSubtitles(timings))

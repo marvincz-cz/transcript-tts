@@ -9,6 +9,8 @@ import cz.marvincz.transcript.tts.model.Boundary
 import cz.marvincz.transcript.tts.model.Expression
 import cz.marvincz.transcript.tts.model.SpeechPart
 import cz.marvincz.transcript.tts.model.ticksToDuration
+import cz.marvincz.transcript.tts.timing.Timing
+import cz.marvincz.transcript.tts.timing.VoiceBasedTimingGenerator
 import cz.marvincz.transcript.tts.utils.muteSection
 import java.io.ByteArrayInputStream
 import java.io.File
@@ -23,6 +25,8 @@ class Client(subscriptionKey: String, region: String) {
         // PCM_SIGNED 48000.0 Hz, 16 bit, mono, 2 bytes/frame, little-endian
         setSpeechSynthesisOutputFormat(SpeechSynthesisOutputFormat.Riff48Khz16BitMonoPcm)
     }
+
+    private val timingGenerator = VoiceBasedTimingGenerator()
 
     fun call(speeches: List<SpeechPart>): TtsResult {
         val ssml = toSSML(speeches)
@@ -45,7 +49,7 @@ class Client(subscriptionKey: String, region: String) {
 
         return TtsResult(
             audioData = result.audioData.muteIndiscernible(boundaries, format),
-            timings = getTimingsFromSpeech(speeches, ssml, boundaries.mapIndexed { index, boundary ->
+            timings = timingGenerator.getTimings(speeches, ssml, boundaries.mapIndexed { index, boundary ->
                 if (index != boundaries.lastIndex) boundary.withPauseTo(boundaries[index + 1])
                 else boundary
             }),
