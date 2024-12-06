@@ -38,7 +38,7 @@ fun Timing?.join(other: Timing): Timing = this?.join(other) ?: other
  */
 fun String.separatorFitnessWeight() = when {
     endsWith(',') -> 0.7
-    last() in listOf('&', '\'', '%', '*') -> 0.4
+    last() in listOf('&', '\'', '%', '*') -> 0.5
     last().isLetterOrDigit() -> 0.4
     endsWith(';') -> 0.8
     endsWith("--") -> 1.2

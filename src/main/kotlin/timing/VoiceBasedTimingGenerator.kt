@@ -143,7 +143,7 @@ class VoiceBasedTimingGenerator : TimingGenerator {
             val minFitness = fitness.minOrNull() ?: break
             val index = fitness.indexOf(minFitness)
 
-            if (minFitness < 15000 && list[index].joinedLength(list[index + 1]) < 40) {
+            if (minFitness < 15000 && list[index].joinedLength(list[index + 1]) < 60) {
                 list = buildList {
                     if (index > 0) addAll(list.subList(0, index))
                     add(list[index].join(list[index + 1]))
