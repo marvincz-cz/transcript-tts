@@ -19,6 +19,7 @@ import cz.marvincz.transcript.tts.utils.combineAudioFiles
 import cz.marvincz.transcript.tts.utils.json
 import java.io.File
 import java.util.Properties
+import kotlin.io.inputStream
 import kotlin.time.Duration.Companion.milliseconds
 
 fun main(args: Array<String>) = Application().main(args)
@@ -28,17 +29,25 @@ private class Application : CliktCommand() {
         installMordantMarkdown()
     }
 
-    private val transcript: File by option().file(mustExist = true, canBeDir = false, mustBeReadable = true).required()
-        .help { "The transcript JSON file" }
-    private val voices: File by option().file(mustExist = true, canBeDir = false, mustBeReadable = true).required()
-        .help { "The voice library" } // TODO describe format
+    private val transcript: Transcript by option().file(mustExist = true, canBeDir = false, mustBeReadable = true)
+        .convert {
+            json.decodeFromString<Transcript>(it.readText())
+        }.required().help { "The transcript JSON file" }
+
+    private val voices: VoiceLibrary by option().file(mustExist = true, canBeDir = false, mustBeReadable = true)
+        .convert {
+            json.decodeFromString<VoiceLibrary>(it.readText())
+        }.required().help { "The voice library" } // TODO describe format
+
     private val output: File by option().file(canBeDir = false).required()
         .help { "The output file where the generated audio will be written" }
-    private val azureProperties: File by option().file(mustExist = true, canBeDir = false, mustBeReadable = true)
-        .required()
-        .help { "The Azure API properties file. Must contain keys `subscription_key` and `region`" }
-    private val sections: List<Section>? by option().convert { parseSections(it, name) }
-        .help {
+
+    private val azureProperties: Properties by option().file(mustExist = true, canBeDir = false, mustBeReadable = true)
+        .convert {
+            Properties().apply { load(it.inputStream()) }
+        }.required().help { "The Azure API properties file. Must contain keys `subscription_key` and `region`" }
+
+    private val sections: List<Section>? by option().convert { parseSections(it, name) }.help {
             """
                 *(optional)* The section of the transcript to use. When not specified, the whole transcript is used.
                 Format is a comma-separated list of pages, optionally with a colon and lines either as a single number or a range with two numbers separated by a hyphen.
@@ -48,9 +57,6 @@ private class Application : CliktCommand() {
         }
 
     override fun run() {
-        val transcript = json.decodeFromString<Transcript>(transcript.readText())
-        val voiceLibrary = json.decodeFromString<VoiceLibrary>(voices.readText())
-
         val lines = transcript.lines
             .joinTexts()
             .filter { line -> sections?.any { it.matches(line) } != false }
@@ -61,24 +67,22 @@ private class Application : CliktCommand() {
             return
         }
 
-        val voices = voiceLibrary.voices + mapExtraVoicesToSpeakers(voiceLibrary, transcript)
+        val voiceMap = voices.voices + voices.mapExtrasToSpeakers(transcript)
 
         val missingVoices = lines.mapTo(mutableSetOf(), Line::speakerOrNarrator).filter { speaker ->
-            speaker !in voices && voiceLibrary.extras.none {
+            speaker !in voiceMap && voices.extras.none {
                 it.assignment == ExtraVoices.AssignmentType.LineRoundRobin && it.speakerRegex.matches(speaker)
             }
         }
         require(missingVoices.isEmpty()) { "Missing TTS voices for speakers: $missingVoices" }
 
-        val extraVoicesByLine = voiceLibrary.extras
+        val extraVoicesByLine = voices.extras
             .filter { it.assignment == ExtraVoices.AssignmentType.LineRoundRobin }
             .map(::ExtraVoicesByLineTracker)
 
-        val properties = Properties().apply { load(azureProperties.inputStream()) }
-
         val client = Client(
-            subscriptionKey = properties.getProperty("subscription_key"),
-            region = properties.getProperty("region"),
+            subscriptionKey = azureProperties.getProperty("subscription_key"),
+            region = azureProperties.getProperty("region"),
         )
 
         val subtitleFile = File(output.path.replaceAfterLast('.', "vtt"))
@@ -86,7 +90,7 @@ private class Application : CliktCommand() {
 
         val chunks = lines.map { line ->
             val speakerName = line.speakerOrNarrator
-            val speaker = voices[speakerName] ?: extraVoicesByLine.first { it.matches(speakerName) }[speakerName]
+            val speaker = voiceMap[speakerName] ?: extraVoicesByLine.first { it.matches(speakerName) }[speakerName]
             SpeechPart(speaker, speakerName, requireNotNull(line.text))
         }.splitToChunks()
 
@@ -128,11 +132,8 @@ private class Application : CliktCommand() {
         )
     }
 
-    private fun mapExtraVoicesToSpeakers(
-        voiceLibrary: VoiceLibrary,
-        transcript: Transcript,
-    ): List<Pair<String, AzureSpeaker>> =
-        voiceLibrary.extras.filter { it.assignment == ExtraVoices.AssignmentType.SpeakerRoundRobin }
+    private fun VoiceLibrary.mapExtrasToSpeakers(transcript: Transcript): List<Pair<String, AzureSpeaker>> =
+        extras.filter { it.assignment == ExtraVoices.AssignmentType.SpeakerRoundRobin }
             .flatMap { extra ->
                 val speakers = transcript.speakers.filter { extra.speakerRegex.matches(it) }
                 speakers.mapIndexed { index, speaker -> speaker to extra.voices[index % extra.voices.size] }
