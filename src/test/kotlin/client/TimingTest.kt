@@ -40,7 +40,7 @@ class TimingTest {
     }
 
     @Test
-    fun textOpening() {
+    fun testOpening() {
         // T100:3-41,T101,T102:1-37
         testTiming(
             timingGenerator = VoiceBasedTimingGenerator(),

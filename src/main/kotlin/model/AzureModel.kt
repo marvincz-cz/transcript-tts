@@ -68,6 +68,8 @@ data class Boundary(
     val textEndOffset = textOffset + text.length
 
     fun withPauseTo(next: Boundary) = copy(pause = next.offset - endOffset)
+
+    fun isPunctuation() = type == SpeechSynthesisBoundaryType.Punctuation && text != "("
 }
 
 fun Long.ticksToDuration() = (this * 100).nanoseconds

@@ -91,7 +91,9 @@ class Client(subscriptionKey: String, region: String) {
 
     private fun ByteArray.muteIndiscernible(boundaries: List<Boundary>, format: AudioFormat) = apply {
         for (boundary in boundaries) {
-            if (boundary.text in listOf("INDISCERNIBLE", "NO-AUDIBLE-RESPONSE")) muteSection(format, boundary.offset, boundary.endOffset)
+            if (boundary.text in listOf("INDISCERNIBLE", "NO-AUDIBLE-RESPONSE", "UNREPORTABLE-SOUND")) {
+                muteSection(format, boundary.offset, boundary.endOffset)
+            }
         }
     }
 

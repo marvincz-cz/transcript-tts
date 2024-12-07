@@ -1,11 +1,9 @@
 package cz.marvincz.transcript.tts.timing
 
-import com.microsoft.cognitiveservices.speech.SpeechSynthesisBoundaryType
 import cz.marvincz.transcript.tts.client.fixForXml
 import cz.marvincz.transcript.tts.client.recoverFromXml
 import cz.marvincz.transcript.tts.model.Boundary
 import cz.marvincz.transcript.tts.model.SpeechPart
-import kotlin.collections.forEach
 import kotlin.time.Duration.Companion.milliseconds
 
 class VoiceBasedTimingGenerator : TimingGenerator {
@@ -98,7 +96,7 @@ class VoiceBasedTimingGenerator : TimingGenerator {
         return filterIndexed { index, it -> it.pause >= minPause || index == lastIndex }
             .map {
                 var index = indexOf(it)
-                while (index < lastIndex && this[index + 1].type == SpeechSynthesisBoundaryType.Punctuation) {
+                while (index < lastIndex && this[index + 1].isPunctuation()) {
                     index++
                 }
                 this[index].copy(pause = it.pause)
@@ -115,10 +113,10 @@ class VoiceBasedTimingGenerator : TimingGenerator {
      */
     private fun List<Boundary>.addPunctuationToPause() = mapIndexed { index, boundary ->
         var pause = boundary.pause
-        if (boundary.type == SpeechSynthesisBoundaryType.Punctuation) pause += boundary.duration
+        if (boundary.isPunctuation()) pause += boundary.duration
 
         var i = index
-        while (i < lastIndex && this[i + 1].type == SpeechSynthesisBoundaryType.Punctuation) {
+        while (i < lastIndex && this[i + 1].isPunctuation()) {
             i++
             pause += this[i].duration + this[i].pause
         }
