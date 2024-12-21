@@ -28,12 +28,20 @@ class Client(subscriptionKey: String, region: String) {
 
     private val timingGenerator = VoiceBasedTimingGenerator()
 
-    fun call(speeches: List<SpeechPart>): TtsResult {
+    /**
+     * Synthesize speech from the [speeches]. Callback [onProgress] receives updates with values between 0 and 1 for 0%-100% progress.
+     */
+    fun synthesize(speeches: List<SpeechPart>, onProgress: (Float) -> Unit): TtsResult {
         val ssml = toSSML(speeches)
+        val textRange = ssml.indexOf("<voice").let { ssml.indexOf(">", it)} until ssml.lastIndexOf("</voice")
+
         val speechSynthesizer = SpeechSynthesizer(speechConfig, null)
 
         val boundaries = mutableListOf<Boundary>()
-        speechSynthesizer.WordBoundary.addEventListener { _, e -> boundaries.add(Boundary(e)) }
+        speechSynthesizer.WordBoundary.addEventListener { _, e ->
+            boundaries.add(Boundary(e))
+            onProgress((e.textOffset - textRange.first) / (textRange.last - textRange.first).toFloat())
+        }
 
         val result = speechSynthesizer.SpeakSsml(ssml)
 

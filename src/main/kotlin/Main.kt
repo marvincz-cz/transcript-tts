@@ -3,11 +3,19 @@ package cz.marvincz.transcript.tts
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.installMordantMarkdown
 import com.github.ajalt.clikt.core.main
+import com.github.ajalt.clikt.core.terminal
 import com.github.ajalt.clikt.parameters.options.convert
 import com.github.ajalt.clikt.parameters.options.help
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.file
+import com.github.ajalt.mordant.animation.progress.animateOnThread
+import com.github.ajalt.mordant.animation.progress.execute
+import com.github.ajalt.mordant.animation.progress.update
+import com.github.ajalt.mordant.widgets.progress.percentage
+import com.github.ajalt.mordant.widgets.progress.progressBar
+import com.github.ajalt.mordant.widgets.progress.progressBarLayout
+import com.github.ajalt.mordant.widgets.progress.text
 import cz.marvincz.transcript.tts.client.Client
 import cz.marvincz.transcript.tts.model.AzureSpeaker
 import cz.marvincz.transcript.tts.model.ExtraVoices
@@ -19,7 +27,6 @@ import cz.marvincz.transcript.tts.utils.combineAudioFiles
 import cz.marvincz.transcript.tts.utils.json
 import java.io.File
 import java.util.Properties
-import kotlin.io.inputStream
 import kotlin.time.Duration.Companion.milliseconds
 
 fun main(args: Array<String>) = Application().main(args)
@@ -48,13 +55,13 @@ private class Application : CliktCommand() {
         }.required().help { "The Azure API properties file. Must contain keys `subscription_key` and `region`" }
 
     private val sections: List<Section>? by option().convert { parseSections(it, name) }.help {
-            """
+        """
                 *(optional)* The section of the transcript to use. When not specified, the whole transcript is used.
                 Format is a comma-separated list of pages, optionally with a colon and lines either as a single number or a range with two numbers separated by a hyphen.
                 
                 Example: `T100:3-41,T101,T102,T103`
             """.trimIndent()
-        }
+    }
 
     override fun run() {
         val lines = transcript.lines
@@ -97,8 +104,11 @@ private class Application : CliktCommand() {
         var chunkOffset = 0.milliseconds
         try {
             val outputs = chunks.mapIndexed { index, chunk ->
-                println("Generating chunk ${index + 1}")
-                val result = client.call(chunk)
+                val progress = getProgressBar(index, chunks.size)
+
+                progress.update { total = 1_000 }
+                val result = client.synthesize(chunk) { progress.update(1_000 * it) }
+                progress.update(1_000)
 
                 val chunkOutput = output.chunkTempFile(index)
                 chunkOutput.writeBytes(result.audioData)
@@ -113,6 +123,12 @@ private class Application : CliktCommand() {
             chunks.indices.forEach { runCatching { output.chunkTempFile(it).delete() } }
         }
     }
+
+    private fun getProgressBar(index: Int, count: Int) = progressBarLayout {
+        text("Chunk ${index + 1}/$count")
+        percentage()
+        progressBar()
+    }.animateOnThread(terminal).also { it.execute() }
 
     private data class Section(val page: String, val lines: IntRange) {
         fun matches(line: Line): Boolean = line.page == page && line.line in lines
@@ -146,7 +162,7 @@ private class Application : CliktCommand() {
     ) {
         fun matches(speaker: String) = extra.speakerRegex.matches(speaker)
 
-        operator fun get(speaker: String) : AzureSpeaker {
+        operator fun get(speaker: String): AzureSpeaker {
             require(matches(speaker))
 
             if (lastSpeaker != speaker && lastSpeaker != null) {
