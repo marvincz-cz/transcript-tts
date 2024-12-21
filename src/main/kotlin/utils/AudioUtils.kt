@@ -1,5 +1,6 @@
 package cz.marvincz.transcript.tts.utils
 
+import java.io.Closeable
 import java.io.File
 import java.io.SequenceInputStream
 import java.util.Collections.enumeration
@@ -9,7 +10,6 @@ import javax.sound.sampled.AudioInputStream
 import javax.sound.sampled.AudioSystem
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.ranges.step
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -43,15 +43,11 @@ fun ByteArray.muteSection(
 }
 
 fun combineAudioFiles(files: List<File>, output: File) {
-    val stream = files.map { AudioSystem.getAudioInputStream(it) }
-        .let { streams ->
-            AudioInputStream(
-                SequenceInputStream(enumeration(streams)),
-                streams.first().format,
-                streams.sumOf { it.frameLength }
-            )
+    Streams(files).use { streams ->
+        AudioInputStream(streams.sequence, streams.format, streams.length).use {
+            AudioSystem.write(it, AudioFileFormat.Type.WAVE, output)
         }
-    AudioSystem.write(stream, AudioFileFormat.Type.WAVE, output)
+    }
 }
 
 private fun frameIndex(duration: Duration, format: AudioFormat) =
@@ -68,4 +64,22 @@ fun ByteArray.littleEndianToShort(index: Int): Short {
 fun ByteArray.shortToLittleEndian(index: Int, value: Short) {
     set(index, value.toByte())
     set(index + 1, (value.toInt() ushr 8).toByte())
+}
+
+/**
+ * Helper class for cleaner work with a sequence of streams
+ */
+private data class Streams(val streams: List<AudioInputStream>) : Closeable {
+    constructor(files: List<File>) : this(files.map { AudioSystem.getAudioInputStream(it) })
+
+    override fun close() = streams.forEach { it.close() }
+
+    val sequence: SequenceInputStream
+        get() = SequenceInputStream(enumeration(streams))
+
+    val format: AudioFormat
+        get() = streams.first().format
+
+    val length: Long
+        get() = streams.sumOf { it.frameLength }
 }

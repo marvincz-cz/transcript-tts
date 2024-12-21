@@ -120,7 +120,7 @@ private class Application : CliktCommand() {
 
             combineAudioFiles(outputs, output)
         } finally {
-            chunks.indices.forEach { runCatching { output.chunkTempFile(it).delete() } }
+            chunks.indices.forEach { runCatching { output.chunkTempFile(it).deleteOnExit() } }
         }
     }
 
