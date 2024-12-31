@@ -43,7 +43,7 @@ fun ByteArray.muteSection(
 }
 
 fun combineAudioFiles(files: List<File>, output: File) {
-    Streams(files).use { streams ->
+    Streams.ofFiles(files).use { streams ->
         AudioInputStream(streams.sequence, streams.format, streams.length).use {
             AudioSystem.write(it, AudioFileFormat.Type.WAVE, output)
         }
@@ -70,8 +70,6 @@ fun ByteArray.shortToLittleEndian(index: Int, value: Short) {
  * Helper class for cleaner work with a sequence of streams
  */
 private data class Streams(val streams: List<AudioInputStream>) : Closeable {
-    constructor(files: List<File>) : this(files.map { AudioSystem.getAudioInputStream(it) })
-
     override fun close() = streams.forEach { it.close() }
 
     val sequence: SequenceInputStream
@@ -82,4 +80,8 @@ private data class Streams(val streams: List<AudioInputStream>) : Closeable {
 
     val length: Long
         get() = streams.sumOf { it.frameLength }
+
+    companion object {
+        fun ofFiles(files: List<File>) = Streams(files.map { AudioSystem.getAudioInputStream(it) })
+    }
 }
