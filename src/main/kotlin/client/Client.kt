@@ -33,7 +33,7 @@ class Client(subscriptionKey: String, region: String) {
      */
     fun synthesize(speeches: List<SpeechPart>, onProgress: (Float) -> Unit): TtsResult {
         val ssml = toSSML(speeches)
-        val textRange = ssml.indexOf("<voice").let { ssml.indexOf(">", it)} until ssml.lastIndexOf("</voice")
+        val textRange = ssml.indexOf("<lang").let { ssml.indexOf(">", it)} until ssml.lastIndexOf("</lang")
 
         val speechSynthesizer = SpeechSynthesizer(speechConfig, null)
 
