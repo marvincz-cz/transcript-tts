@@ -5,9 +5,11 @@ import com.github.ajalt.clikt.core.installMordantMarkdown
 import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.core.terminal
 import com.github.ajalt.clikt.parameters.options.convert
+import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.help
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
+import com.github.ajalt.clikt.parameters.types.enum
 import com.github.ajalt.clikt.parameters.types.file
 import com.github.ajalt.mordant.animation.progress.animateOnThread
 import com.github.ajalt.mordant.animation.progress.execute
@@ -27,6 +29,7 @@ import cz.marvincz.transcript.tts.utils.combineAudioFiles
 import cz.marvincz.transcript.tts.utils.json
 import java.io.File
 import java.util.Properties
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
 fun main(args: Array<String>) = Application().main(args)
@@ -56,11 +59,20 @@ private class Application : CliktCommand() {
 
     private val sections: List<Section>? by option().convert { parseSections(it, name) }.help {
         """
-                *(optional)* The section of the transcript to use. When not specified, the whole transcript is used.
-                Format is a comma-separated list of pages, optionally with a colon and lines either as a single number or a range with two numbers separated by a hyphen.
-                
-                Example: `T100:3-41,T101,T102,T103`
-            """.trimIndent()
+            *(optional)* The section of the transcript to use. When not specified, the whole transcript is used.
+            Format is a comma-separated list of pages, optionally with a colon and lines either as a single number or a range with two numbers separated by a hyphen.
+            
+            Example: `T100:3-41,T101,T102,T103`
+        """.trimIndent()
+    }
+
+    private val muteMode: MuteMode by option().enum<MuteMode>().default(MuteMode.MUTE).help {
+        """
+            *(optional)* The method to deal with sections that need to be muted (i.e. `(INDISCERNIBLE)`).
+             
+            * MUTE *(default)* - mute the section. May be inaccurate in some cases.
+            * EXPORT - export information about the sections, so that they can be muted later manually. 
+        """.trimIndent()
     }
 
     override fun run() {
@@ -95,6 +107,8 @@ private class Application : CliktCommand() {
         val subtitleFile = File(output.path.replaceAfterLast('.', "vtt"))
         subtitleFile.writeText(subtitlesHeader)
 
+        if (muteMode == MuteMode.EXPORT) mutedSectionsHeader()
+
         val chunks = lines.map { line ->
             val speakerName = line.speakerOrNarrator
             val speaker = voiceMap[speakerName] ?: extraVoicesByLine.first { it.matches(speakerName) }[speakerName]
@@ -107,12 +121,17 @@ private class Application : CliktCommand() {
                 val progress = getProgressBar(index, chunks.size)
 
                 progress.update { total = 1_000 }
-                val result = client.synthesize(chunk) { progress.update(1_000 * it) }
+                val result = client.synthesize(chunk, muteMode == MuteMode.MUTE) {
+                    progress.update(1_000 * it)
+                }
                 progress.update(1_000)
 
                 val chunkOutput = output.chunkTempFile(index)
                 chunkOutput.writeBytes(result.audioData)
                 subtitleFile.appendText(getSubtitles(result.timings, chunkOffset))
+                if (muteMode == MuteMode.EXPORT) {
+                    exportMutedSections(result, chunkOffset)
+                }
 
                 chunkOffset += result.duration
                 chunkOutput
@@ -173,6 +192,23 @@ private class Application : CliktCommand() {
             return extra.voices[index]
         }
     }
+
+    private val mutedSectionsFile
+        get() = File(output.path.substringBeforeLast('.') + "-mute.csv")
+
+    private fun mutedSectionsHeader() {
+        mutedSectionsFile.writeText("START;LENGTH")
+    }
+
+    private fun exportMutedSections(result: Client.TtsResult, chunkOffset: Duration) {
+        mutedSectionsFile.appendText(
+            result.mutedSections
+                .map { it.copy(start = it.start + chunkOffset, end = it.end + chunkOffset) }
+                .joinToString(separator = "") { "\n${it.start.rounded()};${it.duration.rounded()}" }
+        )
+    }
+
+    private fun Duration.rounded() = inWholeMilliseconds.milliseconds
 }
 
 private fun File.chunkTempFile(index: Int) =
@@ -212,3 +248,7 @@ fun List<Line>.joinTexts(): List<Line> = runningReduce { acc, line ->
     if (acc.sameSpeaker(line)) line.text?.let { acc.copy(text = "${acc.text} ${line.text}") } ?: acc
     else line
 }.filterIndexed { index, line -> index == lastIndex || !line.sameSpeaker(get(index + 1)) }
+
+private enum class MuteMode {
+    MUTE, EXPORT
+}

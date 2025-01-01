@@ -12,6 +12,7 @@ import cz.marvincz.transcript.tts.model.ticksToDuration
 import cz.marvincz.transcript.tts.timing.Timing
 import cz.marvincz.transcript.tts.timing.VoiceBasedTimingGenerator
 import cz.marvincz.transcript.tts.utils.muteSection
+import cz.marvincz.transcript.tts.utils.replaceAllIndexed
 import java.io.ByteArrayInputStream
 import java.io.File
 import javax.sound.sampled.AudioFormat
@@ -31,7 +32,7 @@ class Client(subscriptionKey: String, region: String) {
     /**
      * Synthesize speech from the [speeches]. Callback [onProgress] receives updates with values between 0 and 1 for 0%-100% progress.
      */
-    fun synthesize(speeches: List<SpeechPart>, onProgress: (Float) -> Unit): TtsResult {
+    fun synthesize(speeches: List<SpeechPart>, mute: Boolean, onProgress: (Float) -> Unit): TtsResult {
         val ssml = toSSML(speeches)
         val textRange = ssml.indexOf("<lang").let { ssml.indexOf(">", it)} until ssml.lastIndexOf("</lang")
 
@@ -54,14 +55,19 @@ class Client(subscriptionKey: String, region: String) {
         boundaries.replaceAll {
             it.copy(offset = it.offset * correctionRatio, duration = it.duration * correctionRatio)
         }
+        boundaries.replaceAllIndexed { index, boundary ->
+            if (index != boundaries.lastIndex) boundary.withPauseTo(boundaries[index + 1])
+            else boundary
+        }
+
+        val mutedSections = mutableListOf<AudioSection>()
+        val mutedAudio = result.audioData.muteIndiscernible(boundaries, format, mutedSections, mute)
 
         return TtsResult(
-            audioData = result.audioData.muteIndiscernible(boundaries, format),
-            timings = timingGenerator.getTimings(speeches, ssml, boundaries.mapIndexed { index, boundary ->
-                if (index != boundaries.lastIndex) boundary.withPauseTo(boundaries[index + 1])
-                else boundary
-            }),
+            audioData = mutedAudio,
+            timings = timingGenerator.getTimings(speeches, ssml, boundaries),
             duration = correctDuration,
+            mutedSections = mutedSections,
         )
     }
 
@@ -97,10 +103,18 @@ class Client(subscriptionKey: String, region: String) {
         File("data/voices/${voice.localName} (${voice.shortName}) - $style.mp3").writeBytes(data)
     }
 
-    private fun ByteArray.muteIndiscernible(boundaries: List<Boundary>, format: AudioFormat) = apply {
+    private fun ByteArray.muteIndiscernible(
+        boundaries: List<Boundary>,
+        format: AudioFormat,
+        mutedSections: MutableList<AudioSection>,
+        mute: Boolean,
+    ) = apply {
         for (boundary in boundaries) {
             if (boundary.text in listOf("INDISCERNIBLE", "NO-AUDIBLE-RESPONSE", "UNREPORTABLE-SOUND")) {
-                muteSection(format, boundary.offset, boundary.endOffset)
+                if (mute) {
+                    muteSection(format, boundary.offset, boundary.endOffset)
+                }
+                mutedSections.add(AudioSection(boundary))
             }
         }
     }
@@ -109,5 +123,14 @@ class Client(subscriptionKey: String, region: String) {
         val audioData: ByteArray,
         val timings: List<Timing>,
         val duration: Duration,
+        val mutedSections: List<AudioSection>
     )
+
+    data class AudioSection(
+        val start: Duration,
+        val end: Duration,
+        val duration: Duration = end - start,
+    ) {
+        constructor(boundary: Boundary) : this(boundary.offset, boundary.endOffset)
+    }
 }
