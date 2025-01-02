@@ -22,7 +22,7 @@ data class Expression(
 )
 
 @Serializable
-data class VoiceLibrary(
+data class VoiceMapping(
     val voices: Map<String, AzureSpeaker>,
     val extras: List<ExtraVoices> = emptyList(),
 )
