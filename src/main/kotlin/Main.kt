@@ -5,7 +5,6 @@ import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.PrintMessage
 import com.github.ajalt.clikt.core.installMordantMarkdown
 import com.github.ajalt.clikt.core.main
-import com.github.ajalt.clikt.core.requireObject
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.core.terminal
 import com.github.ajalt.clikt.parameters.options.convert
@@ -43,26 +42,37 @@ private class Application : CliktCommand() {
         installMordantMarkdown()
     }
 
-    private val azureProperties: Properties by option().file(mustExist = true, canBeDir = false, mustBeReadable = true)
-        .convert {
-            Properties().apply { load(it.inputStream()) }
-        }.required().help { "The Azure API properties file. Must contain keys `subscription_key` and `region`" }
+    override fun helpEpilog(context: Context) =
+        terminal.theme.style("warning")("Command help:") + " application <command> --help"
 
-    override fun run() {
-        currentContext.findOrSetObject {
-            AzureConfig(
-                azureProperties.getProperty(PROPERTY_SUBSCRIPTION_KEY),
-                azureProperties.getProperty(PROPERTY_REGION),
-            )
-        }
-    }
+    override fun run() = Unit
 }
 
-private data class AzureConfig(val subscriptionKey: String, val region: String)
+private abstract class AzureCommand : CliktCommand() {
+    protected val azureConfig: AzureConfig by option("--azure-properties").file(
+        mustExist = true,
+        canBeDir = false,
+        mustBeReadable = true,
+    )
+        .convert {
+            val properties = Properties().apply { load(it.inputStream()) }
 
-private class Transcript : CliktCommand() {
-    private val azureConfig by requireObject<AzureConfig>()
+            AzureConfig(
+                properties.getProperty(PROPERTY_SUBSCRIPTION_KEY),
+                properties.getProperty(PROPERTY_REGION),
+            )
+        }.required()
+        .help { "The Azure API properties file. Must contain keys `$PROPERTY_SUBSCRIPTION_KEY` and `$PROPERTY_REGION`" }
 
+    companion object {
+        private const val PROPERTY_SUBSCRIPTION_KEY = "subscription_key"
+        private const val PROPERTY_REGION = "region"
+    }
+
+    protected data class AzureConfig(val subscriptionKey: String, val region: String)
+}
+
+private class Transcript : AzureCommand() {
     override fun help(context: Context): String = "Generate speech from a transcript"
 
     private val transcript: Transcript by option().file(mustExist = true, canBeDir = false, mustBeReadable = true)
@@ -267,9 +277,7 @@ private class Transcript : CliktCommand() {
     }
 }
 
-private class VoiceLibrary : CliktCommand() {
-    private val azureConfig by requireObject<AzureConfig>()
-
+private class VoiceLibrary : AzureCommand() {
     override fun help(context: Context) = "Generate sample audio for all available voices and exit"
 
     override fun run() {
@@ -290,9 +298,6 @@ private class VoiceLibrary : CliktCommand() {
         throw PrintMessage("Generated sample audio for all available voices under directory \"voices\"")
     }
 }
-
-private const val PROPERTY_SUBSCRIPTION_KEY = "subscription_key"
-private const val PROPERTY_REGION = "region"
 
 private fun CliktCommand.getProgressBar(index: Int, count: Int) = getProgressBar("Chunk ${index + 1}/$count")
 
