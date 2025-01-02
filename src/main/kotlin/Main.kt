@@ -1,11 +1,13 @@
 package cz.marvincz.transcript.tts
 
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.PrintMessage
 import com.github.ajalt.clikt.core.installMordantMarkdown
 import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.core.terminal
 import com.github.ajalt.clikt.parameters.options.convert
 import com.github.ajalt.clikt.parameters.options.default
+import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.help
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
@@ -75,7 +77,12 @@ private class Application : CliktCommand() {
         """.trimIndent()
     }
 
+    private val generateVoices: Boolean by option().flag()
+        .help { "Generate sample audio for all available voices and exit" }
+
     override fun run() {
+        if (generateVoices) generateVoiceSamples()
+
         val lines = transcript.lines
             .joinTexts()
             .filter { line -> sections?.any { it.matches(line) } != false }
@@ -100,8 +107,8 @@ private class Application : CliktCommand() {
             .map(::ExtraVoicesByLineTracker)
 
         val client = Client(
-            subscriptionKey = azureProperties.getProperty("subscription_key"),
-            region = azureProperties.getProperty("region"),
+            subscriptionKey = azureProperties.getProperty(PROPERTY_SUBSCRIPTION_KEY),
+            region = azureProperties.getProperty(PROPERTY_REGION),
         )
 
         val subtitleFile = File(output.path.replaceAfterLast('.', "vtt"))
@@ -143,8 +150,31 @@ private class Application : CliktCommand() {
         }
     }
 
-    private fun getProgressBar(index: Int, count: Int) = progressBarLayout {
-        text("Chunk ${index + 1}/$count")
+    fun generateVoiceSamples() {
+        val client = Client(
+            subscriptionKey = azureProperties.getProperty(PROPERTY_SUBSCRIPTION_KEY),
+            region = azureProperties.getProperty(PROPERTY_REGION),
+        )
+        File("voices").mkdir()
+
+        val voices = client.getAllVoices()
+
+        val progress = getProgressBar("Generating")
+        progress.update { total = voices.size.toLong() }
+        voices
+            .flatMap { voice -> listOf(voice to null) + voice.styleList.map { voice to it } }
+            .forEachIndexed { index, (voice, style) ->
+                client.generateSpeechSample(voice, style)
+                progress.update(index + 1)
+            }
+
+        throw PrintMessage("Generated sample audio for all available voices under directory \"voices\"")
+    }
+
+    private fun getProgressBar(index: Int, count: Int) = getProgressBar("Chunk ${index + 1}/$count")
+
+    private fun getProgressBar(label: String) = progressBarLayout {
+        text(label)
         percentage()
         progressBar()
     }.animateOnThread(terminal).also { it.execute() }
@@ -210,6 +240,9 @@ private class Application : CliktCommand() {
 
     private fun Duration.rounded() = inWholeMilliseconds.milliseconds
 }
+
+private const val PROPERTY_SUBSCRIPTION_KEY = "subscription_key"
+private const val PROPERTY_REGION = "region"
 
 private fun File.chunkTempFile(index: Int) =
     File(buildString {

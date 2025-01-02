@@ -71,25 +71,13 @@ class Client(subscriptionKey: String, region: String) {
         )
     }
 
-    fun getVoices() {
+    fun getAllVoices(): List<VoiceInfo> {
         val speechSynthesizer = SpeechSynthesizer(speechConfig, null)
 
-        val voices =
-            speechSynthesizer.voicesAsync.get().voices.filter { "Multilingual" in it.localName || it.locale == "en-CA" }
-        voices.forEach { voice ->
-            testSpeech(speechSynthesizer, voice)
-
-            voice.styleList.forEach { style ->
-                testSpeech(speechSynthesizer, voice, style)
-            }
-        }
+        return speechSynthesizer.voicesAsync.get().voices.filter { "Multilingual" in it.localName || it.locale == "en-CA" }
     }
 
-    private fun testSpeech(
-        speechSynthesizer: SpeechSynthesizer,
-        voice: VoiceInfo,
-        style: String? = null
-    ) {
+    fun generateSpeechSample(voice: VoiceInfo, style: String?) {
         val speechPart = SpeechPart(
             speaker = AzureSpeaker(voice.shortName, style?.let { Expression(style = style) }),
             speakerName = "${voice.localName} (${voice.shortName})",
@@ -98,9 +86,14 @@ class Client(subscriptionKey: String, region: String) {
                     "Gerald Stanley unlawfully caused the death of Colten Boushie and thereby committed " +
                     "second degree murder."
         )
-        val data = speechSynthesizer.SpeakSsml(toSSML(listOf(speechPart))).audioData!!
 
-        File("data/voices/${voice.localName} (${voice.shortName}) - $style.mp3").writeBytes(data)
+        val speechSynthesizer = SpeechSynthesizer(speechConfig, null)
+
+        val ssml = toSSML(listOf(speechPart))
+        val data = speechSynthesizer.SpeakSsml(ssml).audioData
+
+        File("voices/${voice.localName} (${voice.shortName}) - ${style ?: "default"}.wav")
+            .writeBytes(data)
     }
 
     private fun ByteArray.muteIndiscernible(
