@@ -30,6 +30,7 @@ import cz.marvincz.transcript.tts.model.Transcript
 import cz.marvincz.transcript.tts.model.VoiceMapping
 import cz.marvincz.transcript.tts.utils.combineAudioFiles
 import cz.marvincz.transcript.tts.utils.json
+import cz.marvincz.transcript.tts.utils.prompt
 import java.io.File
 import java.util.Properties
 import kotlin.time.Duration
@@ -43,7 +44,7 @@ private class Application : CliktCommand() {
     }
 
     override fun helpEpilog(context: Context) =
-        terminal.theme.style("warning")("Command help:") + " application <command> --help"
+        terminal.theme.warning("Command help:") + " application <command> --help"
 
     override fun run() = Unit
 }
@@ -107,6 +108,15 @@ private class Transcript : AzureCommand() {
     }
 
     override fun run() {
+        if (output.exists()) {
+            val choice = prompt("$output exists", listOf("Overwrite", "Abort"))
+
+            if (choice != "Overwrite") {
+                echo("Aborting.")
+                return
+            }
+        }
+
         val lines = transcript.lines
             .joinTexts()
             .filter { line -> sections?.any { it.matches(line) } != false }
