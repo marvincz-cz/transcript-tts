@@ -14,13 +14,7 @@ import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.enum
 import com.github.ajalt.clikt.parameters.types.file
-import com.github.ajalt.mordant.animation.progress.animateOnThread
-import com.github.ajalt.mordant.animation.progress.execute
 import com.github.ajalt.mordant.animation.progress.update
-import com.github.ajalt.mordant.widgets.progress.percentage
-import com.github.ajalt.mordant.widgets.progress.progressBar
-import com.github.ajalt.mordant.widgets.progress.progressBarLayout
-import com.github.ajalt.mordant.widgets.progress.text
 import cz.marvincz.transcript.tts.client.Client
 import cz.marvincz.transcript.tts.model.AzureSpeaker
 import cz.marvincz.transcript.tts.model.ExtraVoices
@@ -28,7 +22,9 @@ import cz.marvincz.transcript.tts.model.Line
 import cz.marvincz.transcript.tts.model.SpeechPart
 import cz.marvincz.transcript.tts.model.Transcript
 import cz.marvincz.transcript.tts.model.VoiceMapping
+import cz.marvincz.transcript.tts.utils.audioDuration
 import cz.marvincz.transcript.tts.utils.combineAudioFiles
+import cz.marvincz.transcript.tts.utils.getProgressBar
 import cz.marvincz.transcript.tts.utils.json
 import cz.marvincz.transcript.tts.utils.prompt
 import java.io.File
@@ -107,12 +103,15 @@ private class Transcript : AzureCommand() {
         """.trimIndent()
     }
 
+    private var continueFromIndex: Int = -1
+    private var continueFromDuration: Duration? = null
+
     override fun run() {
         if (output.exists()) {
-            val choice = prompt("$output exists", listOf("Overwrite", "Abort"))
+            val choice = prompt("$output exists", listOf("Overwrite", "Exit"))
 
             if (choice != "Overwrite") {
-                echo("Aborting.")
+                echo("Exiting.")
                 return
             }
         }
@@ -140,12 +139,33 @@ private class Transcript : AzureCommand() {
             .filter { it.assignment == ExtraVoices.AssignmentType.LineRoundRobin }
             .map(::ExtraVoicesByLineTracker)
 
+        if (chunkTempFile(0).exists()) {
+            val choice = prompt("Previous unfinished generation found", listOf("Resume", "Overwrite", "Exit"))
+
+            val maxTempIndex = generateSequence(0) { it + 1 }.first { !chunkTempFile(it).exists() } - 1
+
+            when (choice) {
+                "Resume" -> {
+                    continueFromIndex = maxTempIndex
+                    continueFromDuration = audioDuration(tempFiles(maxTempIndex))
+                    echo("Resuming after ${maxTempIndex + 1} previously generated chunks")
+                }
+
+                "Overwrite" -> tempFiles(maxTempIndex).forEach { it.delete() }
+
+                else -> {
+                    echo("Exiting.")
+                    return
+                }
+            }
+        }
+
         val client = Client(azureConfig.subscriptionKey, azureConfig.region)
 
-        val subtitleFile = File(output.path.replaceAfterLast('.', "vtt"))
-        subtitleFile.writeText(subtitlesHeader)
-
-        if (muteMode == MuteMode.EXPORT) mutedSectionsHeader()
+        if (continueFromDuration == null) {
+            subtitleFile.writeText(subtitlesHeader)
+            if (muteMode == MuteMode.EXPORT) mutedSectionsHeader()
+        }
 
         val chunks = lines.map { line ->
             val speakerName = line.speakerOrNarrator
@@ -153,32 +173,33 @@ private class Transcript : AzureCommand() {
             SpeechPart(speaker, speakerName, requireNotNull(line.text))
         }.splitToChunks()
 
-        var chunkOffset = 0.milliseconds
-        try {
-            val outputs = chunks.mapIndexed { index, chunk ->
-                val progress = getProgressBar(index, chunks.size)
-
-                progress.update { total = 1_000 }
-                val result = client.synthesize(chunk, muteMode == MuteMode.MUTE) {
-                    progress.update(1_000 * it)
-                }
-                progress.update(1_000)
-
-                val chunkOutput = output.chunkTempFile(index)
-                chunkOutput.writeBytes(result.audioData)
-                subtitleFile.appendText(getSubtitles(result.timings, chunkOffset))
-                if (muteMode == MuteMode.EXPORT) {
-                    exportMutedSections(result, chunkOffset)
-                }
-
-                chunkOffset += result.duration
-                chunkOutput
+        var chunkOffset = continueFromDuration ?: 0.milliseconds
+        chunks.forEachIndexed { index, chunk ->
+            if (index <= continueFromIndex) {
+                echo("Skipping chunk ${index + 1}")
+                return@forEachIndexed
             }
 
-            combineAudioFiles(outputs, output)
-        } finally {
-            chunks.indices.forEach { runCatching { output.chunkTempFile(it).deleteOnExit() } }
+            val progress = getProgressBar("Chunk ${index + 1}/${chunks.size}")
+
+            progress.update { total = 1_000 }
+            val result = client.synthesize(chunk, muteMode == MuteMode.MUTE) {
+                progress.update(1_000 * it)
+            }
+            progress.update(1_000)
+
+            chunkTempFile(index).writeBytes(result.audioData)
+            subtitleFile.appendText(getSubtitles(result.timings, chunkOffset))
+            if (muteMode == MuteMode.EXPORT) {
+                exportMutedSections(result, chunkOffset)
+            }
+
+            chunkOffset += result.duration
         }
+
+        val tempFiles = chunks.tempFiles()
+        combineAudioFiles(tempFiles, output)
+        tempFiles.forEach { it.deleteOnExit() }
     }
 
     private data class Section(val page: String, val lines: IntRange) {
@@ -225,8 +246,9 @@ private class Transcript : AzureCommand() {
         }
     }
 
-    private val mutedSectionsFile
-        get() = File(output.path.substringBeforeLast('.') + "-mute.csv")
+    private val subtitleFile by lazy { File(output.path.replaceAfterLast('.', "vtt")) }
+
+    private val mutedSectionsFile by lazy { File(output.path.substringBeforeLast('.') + "-mute.csv") }
 
     private fun mutedSectionsHeader() {
         mutedSectionsFile.writeText("START;LENGTH")
@@ -242,14 +264,18 @@ private class Transcript : AzureCommand() {
 
     private fun Duration.rounded() = inWholeMilliseconds.milliseconds
 
-    private fun File.chunkTempFile(index: Int) =
+    private fun chunkTempFile(index: Int) =
         File(buildString {
-            append(path.substringBeforeLast('.'))
+            append(output.path.substringBeforeLast('.'))
             append(".temp")
             append(index + 1)
             append('.')
-            append(path.substringAfterLast('.'))
+            append(output.path.substringAfterLast('.'))
         })
+
+    private fun tempFiles(lastIndex: Int) = (0..lastIndex).map { chunkTempFile(it) }
+
+    private fun <T> List<T>.tempFiles() = tempFiles(lastIndex)
 
     private fun List<SpeechPart>.splitToChunks(): List<List<SpeechPart>> {
         var chunk = mutableListOf<SpeechPart>()
@@ -308,11 +334,3 @@ private class VoiceLibrary : AzureCommand() {
         throw PrintMessage("Generated sample audio for all available voices under directory \"voices\"")
     }
 }
-
-private fun CliktCommand.getProgressBar(index: Int, count: Int) = getProgressBar("Chunk ${index + 1}/$count")
-
-private fun CliktCommand.getProgressBar(label: String) = progressBarLayout {
-    text(label)
-    percentage()
-    progressBar()
-}.animateOnThread(terminal).also { it.execute() }

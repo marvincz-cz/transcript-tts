@@ -50,6 +50,8 @@ fun combineAudioFiles(files: List<File>, output: File) {
     }
 }
 
+fun audioDuration(files: List<File>) = Streams.ofFiles(files).use { it.duration }
+
 private fun frameIndex(duration: Duration, format: AudioFormat) =
     format.frameSize * (duration.inWholeMilliseconds * format.sampleRate / 1000).toInt()
 
@@ -66,6 +68,9 @@ fun ByteArray.shortToLittleEndian(index: Int, value: Short) {
     set(index + 1, (value.toInt() ushr 8).toByte())
 }
 
+val AudioInputStream.duration
+    get() = (1_000 * frameLength / format.sampleRate).toLong().milliseconds
+
 /**
  * Helper class for cleaner work with a sequence of streams
  */
@@ -80,6 +85,9 @@ private data class Streams(val streams: List<AudioInputStream>) : Closeable {
 
     val length: Long
         get() = streams.sumOf { it.frameLength }
+
+    val duration: Duration
+        get() = streams.fold(Duration.ZERO) { acc, stream -> acc + stream.duration }
 
     companion object {
         fun ofFiles(files: List<File>) = Streams(files.map { AudioSystem.getAudioInputStream(it) })

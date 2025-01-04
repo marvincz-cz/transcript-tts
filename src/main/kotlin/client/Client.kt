@@ -11,6 +11,7 @@ import cz.marvincz.transcript.tts.model.SpeechPart
 import cz.marvincz.transcript.tts.model.ticksToDuration
 import cz.marvincz.transcript.tts.timing.Timing
 import cz.marvincz.transcript.tts.timing.VoiceBasedTimingGenerator
+import cz.marvincz.transcript.tts.utils.duration
 import cz.marvincz.transcript.tts.utils.muteSection
 import cz.marvincz.transcript.tts.utils.replaceAllIndexed
 import java.io.ByteArrayInputStream
@@ -18,7 +19,6 @@ import java.io.File
 import javax.sound.sampled.AudioFormat
 import javax.sound.sampled.AudioSystem
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
 
 class Client(subscriptionKey: String, region: String) {
 
@@ -47,10 +47,9 @@ class Client(subscriptionKey: String, region: String) {
         val result = speechSynthesizer.SpeakSsml(ssml)
 
         val audioInputStream = AudioSystem.getAudioInputStream(ByteArrayInputStream(result.audioData))
-        val format = audioInputStream.format
 
         // Azure reports wrong timing information, we try to correct it
-        val correctDuration = (1_000 * audioInputStream.frameLength / format.sampleRate).toLong().milliseconds
+        val correctDuration = audioInputStream.duration
         val correctionRatio = correctDuration / result.audioDuration.ticksToDuration()
         boundaries.replaceAll {
             it.copy(offset = it.offset * correctionRatio, duration = it.duration * correctionRatio)
@@ -61,7 +60,7 @@ class Client(subscriptionKey: String, region: String) {
         }
 
         val mutedSections = mutableListOf<AudioSection>()
-        val mutedAudio = result.audioData.muteIndiscernible(boundaries, format, mutedSections, mute)
+        val mutedAudio = result.audioData.muteIndiscernible(boundaries, audioInputStream.format, mutedSections, mute)
 
         return TtsResult(
             audioData = mutedAudio,
