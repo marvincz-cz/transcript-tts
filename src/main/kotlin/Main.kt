@@ -70,7 +70,7 @@ private abstract class AzureCommand : CliktCommand() {
 }
 
 private class Transcript : AzureCommand() {
-    override fun help(context: Context): String = "Generate speech from a transcript"
+    override fun help(context: Context) = "Generate speech from a transcript"
 
     private val transcript: Transcript by option().file(mustExist = true, canBeDir = false, mustBeReadable = true)
         .convert {
@@ -110,10 +110,7 @@ private class Transcript : AzureCommand() {
         if (output.exists()) {
             val choice = prompt("$output exists", listOf("Overwrite", "Exit"))
 
-            if (choice != "Overwrite") {
-                echo("Exiting.")
-                return
-            }
+            if (choice != "Overwrite") throw PrintMessage("Exiting.")
         }
 
         val lines = transcript.lines
@@ -121,10 +118,7 @@ private class Transcript : AzureCommand() {
             .filter { line -> sections?.any { it.matches(line) } != false }
             .filter { it.text != null }
 
-        if (lines.isEmpty()) {
-            println("No text found")
-            return
-        }
+        if (lines.isEmpty()) throw PrintMessage("No text found", printError = true)
 
         val voiceMap = voices.voices + voices.mapExtrasToSpeakers(transcript)
 
@@ -153,10 +147,7 @@ private class Transcript : AzureCommand() {
 
                 "Overwrite" -> tempFiles(maxTempIndex).forEach { it.delete() }
 
-                else -> {
-                    echo("Exiting.")
-                    return
-                }
+                else -> throw PrintMessage("Exiting.")
             }
         }
 
@@ -200,6 +191,8 @@ private class Transcript : AzureCommand() {
         val tempFiles = chunks.tempFiles()
         combineAudioFiles(tempFiles, output)
         tempFiles.forEach { it.deleteOnExit() }
+
+        echo("Saved to ${output.absolutePath}")
     }
 
     private data class Section(val page: String, val lines: IntRange) {
@@ -318,7 +311,7 @@ private class VoiceLibrary : AzureCommand() {
 
     override fun run() {
         val client = Client(azureConfig.subscriptionKey, azureConfig.region)
-        File("voices").mkdir()
+        val dir = File("voices").apply { mkdir() }
 
         val voices = client.getAllVoices()
 
@@ -331,6 +324,6 @@ private class VoiceLibrary : AzureCommand() {
                 progress.update(index + 1)
             }
 
-        throw PrintMessage("Generated sample audio for all available voices under directory \"voices\"")
+        echo("Generated sample audio for all available voices at ${dir.absolutePath}")
     }
 }
