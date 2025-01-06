@@ -28,6 +28,8 @@ fun toSSML(speeches: List<SpeechPart>) = buildString {
 fun String.fixForXml() = escapeXml()
     .replace("[sic]", "")
     .replace("(sic)", "")
+    .replace("(As read)", "")
+    .replace("(All)", "")
     .replace("(phonetic)", "")
     .replace("(NO AUDIBLE RESPONSE)", "(NO-AUDIBLE-RESPONSE)")
     .replace("(No audible response)", "(NO-AUDIBLE-RESPONSE)")
