@@ -73,7 +73,7 @@ class Client(subscriptionKey: String, region: String) {
     fun getAllVoices(): List<VoiceInfo> {
         val speechSynthesizer = SpeechSynthesizer(speechConfig, null)
 
-        return speechSynthesizer.voicesAsync.get().voices.filter { "Multilingual" in it.localName || it.locale == "en-CA" }
+        return speechSynthesizer.voicesAsync.get().voices.filter { "Multilingual" in it.shortName || it.locale == "en-CA" }
     }
 
     fun generateSpeechSample(voice: VoiceInfo, style: String?) {
