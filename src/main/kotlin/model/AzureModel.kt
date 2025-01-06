@@ -30,10 +30,19 @@ data class VoiceMapping(
 @Serializable
 data class ExtraVoices(
     @Contextual
-    val speakerRegex: Regex,
+    val speakerRegex: Regex?,
+    val speakers: List<String>?,
     val voices: List<AzureSpeaker>,
     val assignment: AssignmentType,
 ) {
+    init {
+        requireNotNull(speakerRegex ?: speakers) {
+            "Either speakerRegex or speakers must be provided."
+        }
+    }
+
+    fun matches(speaker: String): Boolean = speakerRegex?.matches(speaker) ?: speakers?.contains(speaker) ?: false
+
     enum class AssignmentType {
         SpeakerRoundRobin, LineRoundRobin
     }

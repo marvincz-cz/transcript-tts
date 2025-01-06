@@ -124,7 +124,7 @@ private class Transcript : AzureCommand() {
 
         val missingVoices = lines.mapTo(mutableSetOf(), Line::speakerOrNarrator).filter { speaker ->
             speaker !in voiceMap && voices.extras.none {
-                it.assignment == ExtraVoices.AssignmentType.LineRoundRobin && it.speakerRegex.matches(speaker)
+                it.assignment == ExtraVoices.AssignmentType.LineRoundRobin && it.matches(speaker)
             }
         }
         require(missingVoices.isEmpty()) { "Missing TTS voices for speakers: $missingVoices" }
@@ -216,7 +216,7 @@ private class Transcript : AzureCommand() {
     private fun VoiceMapping.mapExtrasToSpeakers(transcript: Transcript): List<Pair<String, AzureSpeaker>> =
         extras.filter { it.assignment == ExtraVoices.AssignmentType.SpeakerRoundRobin }
             .flatMap { extra ->
-                val speakers = transcript.speakers.filter { extra.speakerRegex.matches(it) }
+                val speakers = transcript.speakers.filter { extra.matches(it) }
                 speakers.mapIndexed { index, speaker -> speaker to extra.voices[index % extra.voices.size] }
             }
 
@@ -225,7 +225,7 @@ private class Transcript : AzureCommand() {
         var index: Int = 0,
         var lastSpeaker: String? = null,
     ) {
-        fun matches(speaker: String) = extra.speakerRegex.matches(speaker)
+        fun matches(speaker: String) = extra.matches(speaker)
 
         operator fun get(speaker: String): AzureSpeaker {
             require(matches(speaker))
