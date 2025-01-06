@@ -15,6 +15,8 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.modules.SerializersModule
 
 val json = Json {
+    explicitNulls = false
+
     serializersModule = SerializersModule {
         contextual(Regex::class, RegexSerializer)
     }
