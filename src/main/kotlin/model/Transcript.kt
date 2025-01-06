@@ -29,3 +29,8 @@ enum class LineType {
     RULER,
     PARAGRAPH
 }
+
+fun List<Line>.joinTexts(): List<Line> = runningReduce { acc, line ->
+    if (acc.sameSpeaker(line)) line.text?.let { acc.copy(text = "${acc.text} ${line.text}") } ?: acc
+    else line
+}.filterIndexed { index, line -> index == lastIndex || !line.sameSpeaker(get(index + 1)) }

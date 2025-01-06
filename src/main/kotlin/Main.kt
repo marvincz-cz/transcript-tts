@@ -22,6 +22,7 @@ import cz.marvincz.transcript.tts.model.Line
 import cz.marvincz.transcript.tts.model.SpeechPart
 import cz.marvincz.transcript.tts.model.Transcript
 import cz.marvincz.transcript.tts.model.VoiceMapping
+import cz.marvincz.transcript.tts.model.joinTexts
 import cz.marvincz.transcript.tts.utils.audioDuration
 import cz.marvincz.transcript.tts.utils.combineAudioFiles
 import cz.marvincz.transcript.tts.utils.getProgressBar
@@ -290,11 +291,6 @@ private class Transcript : AzureCommand() {
     }
 
     private val sectionRegex = Regex("(?<page>T\\d+)(?::(?<lineFrom>\\d+)(?:-(?<lineTo>\\d+))?)?")
-
-    private fun List<Line>.joinTexts(): List<Line> = runningReduce { acc, line ->
-        if (acc.sameSpeaker(line)) line.text?.let { acc.copy(text = "${acc.text} ${line.text}") } ?: acc
-        else line
-    }.filterIndexed { index, line -> index == lastIndex || !line.sameSpeaker(get(index + 1)) }
 
     private enum class MuteMode {
         MUTE, EXPORT

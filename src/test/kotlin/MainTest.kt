@@ -2,6 +2,7 @@ package cz.marvincz.transcript.tts
 
 import cz.marvincz.transcript.tts.model.Line
 import cz.marvincz.transcript.tts.model.LineType
+import cz.marvincz.transcript.tts.model.joinTexts
 import kotlin.test.Test
 import org.junit.jupiter.api.Assertions
 
