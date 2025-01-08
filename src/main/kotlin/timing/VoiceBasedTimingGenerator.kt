@@ -10,6 +10,7 @@ class VoiceBasedTimingGenerator : TimingGenerator {
     companion object {
         private val BASE_PAUSE = 12.5.milliseconds
         private const val INITIAL_PAUSE_FACTOR = 21
+        private const val MAX_JOIN_LENGTH = 60
     }
 
     override fun getTimings(speeches: List<SpeechPart>, ssml: String, boundaries: List<Boundary>): List<Timing> {
@@ -56,7 +57,15 @@ class VoiceBasedTimingGenerator : TimingGenerator {
 
             val text = match.value.trim()
             if (text.length <= 85 || pauseFactor == 2) {
-                add(
+                if (text.length > 85) TextBasedTimingGenerator().splitSpeech(
+                    builtList = this,
+                    speechText = speechText,
+                    speaker = speaker,
+                    boundaries = boundaries.filter { it.textOffset in start.textOffset..split.textOffset },
+                    ssml = ssml,
+                    startIndex = index - 1
+                )
+                else add(
                     Timing(
                         speaker = speaker,
                         text = text,
@@ -134,14 +143,15 @@ class VoiceBasedTimingGenerator : TimingGenerator {
 
             val fitness = list.mapIndexedNotNull { index, timing ->
                 if (index < list.lastIndex) {
-                    timing.joinFitness(list[index + 1])
+                    val other = list[index + 1]
+                    if (timing.joinedLength(other) < MAX_JOIN_LENGTH) timing.joinFitness(other) else Double.MAX_VALUE
                 } else null
             }
 
             val minFitness = fitness.minOrNull() ?: break
             val index = fitness.indexOf(minFitness)
 
-            if (minFitness < 15000 && list[index].joinedLength(list[index + 1]) < 60) {
+            if (minFitness < 15000 && list[index].joinedLength(list[index + 1]) < MAX_JOIN_LENGTH) {
                 list = buildList {
                     if (index > 0) addAll(list.subList(0, index))
                     add(list[index].join(list[index + 1]))

@@ -10,41 +10,56 @@ class TextBasedTimingGenerator : TimingGenerator {
     override fun getTimings(speeches: List<SpeechPart>, ssml: String, boundaries: List<Boundary>): List<Timing> {
         var index = 0
 
-        return speeches.flatMap { speech ->
-            val speaker = speech.speakerName
-            val sentences = getSentences(speech)
-
-            val timings = mutableListOf<Timing>()
-            var wipTiming: Timing? = null
-            sentences.forEach { sentence ->
-                val xmlSentence = sentence.fixForXml()
-                index = ssml.indexOf(xmlSentence, index + 1)
-
-                val start = boundaries.firstOrNull { it.textOffset == index }?.offset ?: wipTiming?.start
-                val end = boundaries.firstOrNull { it.textEndOffset == index + xmlSentence.length }?.endOffset
-
-                val timing = wipTiming.join(Timing(speaker, sentence, start ?: 0.milliseconds, end ?: 0.milliseconds))
-                wipTiming = null
-
-                if (start != null && end != null) {
-                    timings.add(timing)
-                } else if (start == null && end == null) {
-                    throw Exception("Could not find timing for \"$sentence\"")
-                } else if (start == null) {
-                    timings.add(timings.removeLast().join(timing))
-                } else {
-                    wipTiming = timing
-                }
+        return buildList {
+            speeches.forEach { speech ->
+                index = splitSpeech(this, speech.text, speech.speakerName, boundaries, ssml, index)
             }
-            // If we didn't find the end for the last sentence in this <voice> tag, use the last sound in the tag for the end time
-            wipTiming?.let { wip ->
-                val indexOfClosingTag = ssml.indexOf("</voice>", index)
-                val endOffset = boundaries.last { it.textOffset < indexOfClosingTag }.endOffset
-                timings.add(wip.copy(end = endOffset))
-            }
-
-            return@flatMap timings
         }
+    }
+
+    fun splitSpeech(
+        builtList: MutableList<Timing>,
+        speechText: String,
+        speaker: String,
+        boundaries: List<Boundary>,
+        ssml: String,
+        startIndex: Int
+    ): Int {
+        var index = startIndex
+        val sentences = getSentences(speechText)
+
+        val timings = mutableListOf<Timing>()
+        var wipTiming: Timing? = null
+        sentences.forEach { sentence ->
+            val xmlSentence = sentence.fixForXml()
+            index = ssml.indexOf(xmlSentence, index + 1)
+
+            val start = boundaries.firstOrNull { it.textOffset == index }?.offset ?: wipTiming?.start
+            val end = boundaries.firstOrNull { it.textEndOffset == index + xmlSentence.length }?.endOffset
+
+            val timing =
+                wipTiming.join(Timing(speaker, sentence, start ?: 0.milliseconds, end ?: 0.milliseconds))
+            wipTiming = null
+
+            if (start != null && end != null) {
+                timings.add(timing)
+            } else if (start == null && end == null) {
+                throw Exception("Could not find timing for \"$sentence\"")
+            } else if (start == null) {
+                timings.add(timings.removeLast().join(timing))
+            } else {
+                wipTiming = timing
+            }
+        }
+        // If we didn't find the end for the last sentence in this <voice> tag, use the last sound in the tag for the end time
+        wipTiming?.let { wip ->
+            val indexOfClosingTag = ssml.indexOf("</voice>", index)
+            val endOffset = boundaries.last { it.textOffset < indexOfClosingTag }.endOffset
+            timings.add(wip.copy(end = endOffset))
+        }
+
+        builtList.addAll(timings)
+        return index
     }
 
     /**
@@ -52,8 +67,8 @@ class TextBasedTimingGenerator : TimingGenerator {
      * Second pass: Join very short "sentences" on one line
      * Third pass: Split very long unbroken "sentences"
      */
-    fun getSentences(speech: SpeechPart): List<String> {
-        val sentences = sentenceRegex.findAll(speech.text).map { it.groups[1]!!.value }.toList()
+    private fun getSentences(speechText: String): List<String> {
+        val sentences = sentenceRegex.findAll(speechText).map { it.groups[1]!!.value }.toList()
 
         return splitSentences(joinSentences(sentences))
     }
