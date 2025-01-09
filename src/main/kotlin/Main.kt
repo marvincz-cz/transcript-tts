@@ -47,7 +47,7 @@ private class Application : CliktCommand() {
 }
 
 private abstract class AzureCommand : CliktCommand() {
-    protected val azureConfig: AzureConfig by option("--azure-properties").file(
+    val azureConfig: AzureConfig by option("--azure-properties").file(
         mustExist = true,
         canBeDir = false,
         mustBeReadable = true,
@@ -67,7 +67,7 @@ private abstract class AzureCommand : CliktCommand() {
         private const val PROPERTY_REGION = "region"
     }
 
-    protected data class AzureConfig(val subscriptionKey: String, val region: String)
+    data class AzureConfig(val subscriptionKey: String, val region: String)
 }
 
 private class Transcript : AzureCommand() {
@@ -88,10 +88,11 @@ private class Transcript : AzureCommand() {
 
     private val sections: List<Section>? by option().convert { parseSections(it, name) }.help {
         """
-            *(optional)* The section of the transcript to use. When not specified, the whole transcript is used.
-            Format is a comma-separated list of pages, optionally with a colon and lines either as a single number or a range with two numbers separated by a hyphen.
+            *(optional)* The sections of the transcript to use. When not specified, the whole transcript is used.
+            Format is a comma-separated list of sections. A section is a page or a range of pages as first and last page separated by two dots.
+            A single page can optionally specify lines, using a colon and a single line number or a range as two numbers separated by a hyphen.
             
-            Example: `T100:3-41,T101,T102,T103`
+            Example: `T100:3-41,T100..T103,T104:1`
         """.trimIndent()
     }
 
@@ -196,8 +197,13 @@ private class Transcript : AzureCommand() {
         echo("Saved to ${output.absolutePath}")
     }
 
-    private data class Section(val page: String, val lines: IntRange) {
-        fun matches(line: Line): Boolean = line.page == page && line.line in lines
+    private data class Section(val pages: IntRange, val lines: IntRange) {
+        constructor(pages: ClosedRange<String>, lines: IntRange) : this(
+            pages.start.substringAfter("T").toInt()..pages.endInclusive.substringAfter("T").toInt(),
+            lines
+        )
+
+        fun matches(line: Line) = line.page.substringAfter("T").toInt() in pages && line.line in lines
     }
 
     private fun parseSections(value: String, optionName: String) = value.split(',').map { section ->
@@ -205,12 +211,13 @@ private class Transcript : AzureCommand() {
             requireNotNull(sectionRegex.matchEntire(section)) { "$optionName does not match the format" }.groups
 
         val page = matchGroups["page"]!!.value
+        val endPage = matchGroups["endPage"]?.value
         val lineFrom = matchGroups["lineFrom"]?.value?.toInt()
         val lineTo = matchGroups["lineTo"]?.value?.toInt()
 
         Section(
-            page = page,
-            lines = lineFrom?.let { IntRange(it, lineTo ?: lineFrom) } ?: IntRange(Int.MIN_VALUE, Int.MAX_VALUE)
+            pages = page..(endPage ?: page),
+            lines = lineFrom?.let { it..(lineTo ?: it) } ?: Int.MIN_VALUE..Int.MAX_VALUE
         )
     }
 
@@ -290,7 +297,7 @@ private class Transcript : AzureCommand() {
         return chunks
     }
 
-    private val sectionRegex = Regex("(?<page>T\\d+)(?::(?<lineFrom>\\d+)(?:-(?<lineTo>\\d+))?)?")
+    private val sectionRegex = Regex("(?<page>T\\d+)(?:\\.\\.(?<endPage>T\\d+)|:(?<lineFrom>\\d+)(?:-(?<lineTo>\\d+))?)?")
 
     private enum class MuteMode {
         MUTE, EXPORT
