@@ -31,6 +31,16 @@ enum class LineType {
 }
 
 fun List<Line>.joinTexts(): List<Line> = runningReduce { acc, line ->
-    if (acc.sameSpeaker(line)) line.text?.let { acc.copy(text = "${acc.text} ${line.text}") } ?: acc
+    if (acc.sameSpeaker(line)) line.text?.let { acc.copy(text = joinTexts(acc.text, line.text)) } ?: acc
     else line
 }.filterIndexed { index, line -> index == lastIndex || !line.sameSpeaker(get(index + 1)) }
+
+private fun joinTexts(acc: String?, text: String): String {
+    if (acc == null) return text
+
+    return if (numberEnd.containsMatchIn(acc) && numberStart.containsMatchIn(text)) "$acc$text"
+    else "$acc $text"
+}
+
+private val numberEnd = Regex("\\d+-$")
+private val numberStart = Regex("^\\d+")

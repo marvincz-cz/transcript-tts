@@ -12,6 +12,12 @@ class MainTest {
         val lines = transcriptLines.joinTexts()
         Assertions.assertArrayEquals(expectedJoined.toTypedArray(), lines.toTypedArray())
     }
+
+    @Test
+    fun testJoinNumbers() {
+        val lines = numberLines.joinTexts()
+        Assertions.assertEquals(numbersJoined, lines.single().text)
+    }
 }
 
 private val transcriptLines = listOf(
@@ -33,3 +39,16 @@ private val expectedJoined = listOf(
     Line(type = LineType.SPEECH, speaker = "MR. SPENCER", text = "Okay. And were you aware there was a witness saying the exact opposite?", page = "T168", line = 39),
     Line(type = LineType.SPEECH, speaker = "CORPORAL HEROUX", text = "No.", page = "T168", line = 4)
 )
+
+private val numberLines = listOf(
+    Line(type = LineType.SPEECH, speaker = "THE COURT CLERK", text = "Number 45. Number 45? Number 53. 5-",page = "T19", line = 18),
+    Line(type = LineType.SPEECH, speaker = "THE COURT CLERK", text = "3? Number 58. Number 58? Number 61. 61? Number 77. Number 77? Number 80.",page = "T19", line = 19),
+    Line(type = LineType.SPEECH, speaker = "THE COURT CLERK", text = "Number 80? Number 99. Number 99? Number 117. 1-1-7? Number 143. 1-4-3?",page = "T19", line = 20),
+    Line(type = LineType.SPEECH, speaker = "THE COURT CLERK", text = "Number 149. 1-4-9? Number 2-0-8. 2-0-8? Number 245. 2-4-5? Number 287. 2-8-",page = "T19", line = 21),
+    Line(type = LineType.SPEECH, speaker = "THE COURT CLERK", text = "7? Number 3-0-6. 3-0-6? 318. Number 318? Number 425. 4-2-5? Number 474. 4-",page = "T19", line = 22),
+    Line(type = LineType.SPEECH, speaker = "THE COURT CLERK", text = "7-4? Number 475. 4-7-5? Number 499. 4-9-9? Number 550. 5-5-0? 572. 5-7-2?",page = "T19", line = 23),
+    Line(type = LineType.SPEECH, speaker = "THE COURT CLERK", text = "Number 618. 6-1-8? Number 621. 6-2-1?",page = "T19", line = 24),
+)
+
+private val numbersJoined =
+    "Number 45. Number 45? Number 53. 5-3? Number 58. Number 58? Number 61. 61? Number 77. Number 77? Number 80. Number 80? Number 99. Number 99? Number 117. 1-1-7? Number 143. 1-4-3? Number 149. 1-4-9? Number 2-0-8. 2-0-8? Number 245. 2-4-5? Number 287. 2-8-7? Number 3-0-6. 3-0-6? 318. Number 318? Number 425. 4-2-5? Number 474. 4-7-4? Number 475. 4-7-5? Number 499. 4-9-9? Number 550. 5-5-0? 572. 5-7-2? Number 618. 6-1-8? Number 621. 6-2-1?"
