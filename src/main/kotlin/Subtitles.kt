@@ -10,9 +10,15 @@ fun getSubtitles(timings: List<Timing>, offset: Duration) = timings.joinToString
     "${(it.start + offset).format()} --> ${(it.end + offset).format()}\n<v ${it.speaker}>${it.text}"
 }
 
-private fun Duration.format() = toComponents { minutes, seconds, nanoseconds ->
+private fun Duration.format() = toComponents { hours, minutes, seconds, nanoseconds ->
     val milliseconds = nanoseconds / 1_000_000
-    "${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${
-        milliseconds.toString().padStart(3, '0')
-    }"
+    buildString {
+        append(hours.toString().padStart(2, '0'))
+        append(":")
+        append(minutes.toString().padStart(2, '0'))
+        append(":")
+        append(seconds.toString().padStart(2, '0'))
+        append(".")
+        append(milliseconds.toString().padStart(3, '0'))
+    }
 }
