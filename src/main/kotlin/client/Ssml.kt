@@ -7,9 +7,9 @@ fun toSSML(speeches: List<SpeechPart>) = buildString {
 
     speeches.forEach { speech ->
         val text = speech.text.fixForXml()
-        append("<voice name=\"${speech.speaker.voiceId}\">")
+        append("<voice name=\"${speech.speaker.speaker.voiceId}\">")
         append("<lang xml:lang=\"en-CA\">")
-        speech.speaker.expression?.let { expression ->
+        speech.speaker.speaker.expression?.let { expression ->
             append("<mstts:express-as style=\"${expression.style}\"")
             expression.role?.let { append(" role=\"$it\"") }
             expression.styleDegree?.let { append(" styledegree=\"$it\"") }

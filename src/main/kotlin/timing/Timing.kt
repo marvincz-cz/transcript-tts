@@ -1,6 +1,7 @@
 package cz.marvincz.transcript.tts.timing
 
 import cz.marvincz.transcript.tts.model.Boundary
+import cz.marvincz.transcript.tts.model.SpeakerType
 import cz.marvincz.transcript.tts.model.SpeechPart
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -11,6 +12,7 @@ interface TimingGenerator {
 
 data class Timing(
     val speaker: String,
+    val speakerType: SpeakerType,
     val text: String,
     val start: Duration,
     val end: Duration,

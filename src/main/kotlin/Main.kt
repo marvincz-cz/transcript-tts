@@ -16,9 +16,9 @@ import com.github.ajalt.clikt.parameters.types.enum
 import com.github.ajalt.clikt.parameters.types.file
 import com.github.ajalt.mordant.animation.progress.update
 import cz.marvincz.transcript.tts.client.Client
-import cz.marvincz.transcript.tts.model.AzureSpeaker
 import cz.marvincz.transcript.tts.model.ExtraVoices
 import cz.marvincz.transcript.tts.model.Line
+import cz.marvincz.transcript.tts.model.SpeakerInfo
 import cz.marvincz.transcript.tts.model.SpeechPart
 import cz.marvincz.transcript.tts.model.Transcript
 import cz.marvincz.transcript.tts.model.VoiceMapping
@@ -221,11 +221,16 @@ private class Transcript : AzureCommand() {
         )
     }
 
-    private fun VoiceMapping.mapExtrasToSpeakers(transcript: Transcript): List<Pair<String, AzureSpeaker>> =
+    private fun VoiceMapping.mapExtrasToSpeakers(transcript: Transcript): List<Pair<String, SpeakerInfo>> =
         extras.filter { it.assignment == ExtraVoices.AssignmentType.SpeakerRoundRobin }
             .flatMap { extra ->
                 val speakers = transcript.speakers.filter { extra.matches(it) }
-                speakers.mapIndexed { index, speaker -> speaker to extra.voices[index % extra.voices.size] }
+                speakers.mapIndexed { index, speaker ->
+                    speaker to SpeakerInfo(
+                        extra.voices[index % extra.voices.size],
+                        extra.speakerType,
+                    )
+                }
             }
 
     private data class ExtraVoicesByLineTracker(
@@ -235,7 +240,7 @@ private class Transcript : AzureCommand() {
     ) {
         fun matches(speaker: String) = extra.matches(speaker)
 
-        operator fun get(speaker: String): AzureSpeaker {
+        operator fun get(speaker: String): SpeakerInfo {
             require(matches(speaker))
 
             if (lastSpeaker != speaker && lastSpeaker != null) {
@@ -243,11 +248,11 @@ private class Transcript : AzureCommand() {
             }
             lastSpeaker = speaker
 
-            return extra.voices[index]
+            return SpeakerInfo(extra.voices[index], extra.speakerType)
         }
     }
 
-    private val subtitleFile by lazy { File(output.path.replaceAfterLast('.', "vtt")) }
+    private val subtitleFile by lazy { File(output.path.replaceAfterLast('.', "ass")) }
 
     private val mutedSectionsFile by lazy { File(output.path.substringBeforeLast('.') + "-mute.csv") }
 
@@ -297,7 +302,8 @@ private class Transcript : AzureCommand() {
         return chunks
     }
 
-    private val sectionRegex = Regex("(?<page>T\\d+)(?:\\.\\.(?<endPage>T\\d+)|:(?<lineFrom>\\d+)(?:-(?<lineTo>\\d+))?)?")
+    private val sectionRegex =
+        Regex("(?<page>T\\d+)(?:\\.\\.(?<endPage>T\\d+)|:(?<lineFrom>\\d+)(?:-(?<lineTo>\\d+))?)?")
 
     private enum class MuteMode {
         MUTE, EXPORT

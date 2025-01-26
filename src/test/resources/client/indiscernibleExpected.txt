@@ -1,0 +1,12 @@
+50ms|1.262500s|Just the --
+1.275s|4.15s|the TV must shut off after a while.
+4.4s|6.087500s|Are those televisions on?
+6.375s|8.175s|I just turned --
+8.187500s|10.212500s|that should turn both of them on, shouldn’t it?
+10.487500s|12.462500s|Yeah. But this one’s the red.
+12.712500s|15.675s|Oh, maybe (INDISCERNIBLE).
+15.925s|17.112500s|(INDISCERNIBLE).
+17.362500s|18.512500s|Do I have to point it at it?
+18.762500s|19.612500s|Oh, there it comes.
+19.862500s|21.425s|Oh, okay.
+21.675s|23.9s|There we go. We’re up and running.

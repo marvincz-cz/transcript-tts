@@ -3,6 +3,7 @@ package cz.marvincz.transcript.tts.timing
 import cz.marvincz.transcript.tts.client.fixForXml
 import cz.marvincz.transcript.tts.client.recoverFromXml
 import cz.marvincz.transcript.tts.model.Boundary
+import cz.marvincz.transcript.tts.model.SpeakerType
 import cz.marvincz.transcript.tts.model.SpeechPart
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -25,6 +26,7 @@ class VoiceBasedTimingGenerator : TimingGenerator {
                     index = splitSpeech(
                         speechText = speech.text,
                         speaker = speech.speakerName,
+                        speakerType = speech.speaker.speakerType,
                         ssml = ssml,
                         boundaries = boundaries.filter { it.textOffset in index..endIndex }.addPunctuationToPause(),
                         startIndex = index,
@@ -38,6 +40,7 @@ class VoiceBasedTimingGenerator : TimingGenerator {
     private fun MutableList<Timing>.splitSpeech(
         speechText: String,
         speaker: String,
+        speakerType: SpeakerType,
         ssml: String,
         boundaries: List<Boundary>,
         startIndex: Int,
@@ -61,6 +64,7 @@ class VoiceBasedTimingGenerator : TimingGenerator {
                     builtList = this,
                     speechText = speechText,
                     speaker = speaker,
+                    speakerType = speakerType,
                     boundaries = boundaries.filter { it.textOffset in start.textOffset..split.textOffset },
                     ssml = ssml,
                     startIndex = index - 1
@@ -68,6 +72,7 @@ class VoiceBasedTimingGenerator : TimingGenerator {
                 else add(
                     Timing(
                         speaker = speaker,
+                        speakerType = speakerType,
                         text = text,
                         start = start.offset,
                         end = split.endOffset,
@@ -78,6 +83,7 @@ class VoiceBasedTimingGenerator : TimingGenerator {
                 splitSpeech(
                     speechText = text,
                     speaker = speaker,
+                    speakerType = speakerType,
                     ssml = ssml,
                     boundaries = boundaries.filter { it.textOffset in start.textOffset..split.textOffset },
                     startIndex = index,

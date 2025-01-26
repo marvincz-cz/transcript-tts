@@ -7,6 +7,8 @@ import com.microsoft.cognitiveservices.speech.VoiceInfo
 import cz.marvincz.transcript.tts.model.AzureSpeaker
 import cz.marvincz.transcript.tts.model.Boundary
 import cz.marvincz.transcript.tts.model.Expression
+import cz.marvincz.transcript.tts.model.SpeakerInfo
+import cz.marvincz.transcript.tts.model.SpeakerType
 import cz.marvincz.transcript.tts.model.SpeechPart
 import cz.marvincz.transcript.tts.model.ticksToDuration
 import cz.marvincz.transcript.tts.timing.Timing
@@ -34,7 +36,7 @@ class Client(subscriptionKey: String, region: String) {
      */
     fun synthesize(speeches: List<SpeechPart>, mute: Boolean, onProgress: (Float) -> Unit): TtsResult {
         val ssml = toSSML(speeches)
-        val textRange = ssml.indexOf("<lang").let { ssml.indexOf(">", it)} until ssml.lastIndexOf("</lang")
+        val textRange = ssml.indexOf("<lang").let { ssml.indexOf(">", it) } until ssml.lastIndexOf("</lang")
 
         val speechSynthesizer = SpeechSynthesizer(speechConfig, null)
 
@@ -78,7 +80,10 @@ class Client(subscriptionKey: String, region: String) {
 
     fun generateSpeechSample(voice: VoiceInfo, style: String?) {
         val speechPart = SpeechPart(
-            speaker = AzureSpeaker(voice.shortName, style?.let { Expression(style = style) }),
+            speaker = SpeakerInfo(
+                AzureSpeaker(voice.shortName, style?.let { Expression(style = style) }),
+                SpeakerType.Other
+            ),
             speakerName = "${voice.localName} (${voice.shortName})",
             text = "Yes, My Lord. Okay. So the -- P-4 -- what is the document entitled? The case involves " +
                     "an allegation that on or about the 9th day of August, 2016, at or near Biggar, Saskatchewan, " +

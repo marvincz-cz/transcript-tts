@@ -1,0 +1,7 @@
+50ms|400ms|If I may,
+400ms|3.25s|I’d like to refer to my notes from time to time just to keep things in --
+3.25s|4.3s|in line and perspective?
+4.3s|6.3s|I’ve also prepared a PowerPoint presentation,
+6.3s|7.45s|along with these booklets,
+7.45s|9.6s|that are the same photographs as in the PowerPoint.
+9.6s|13s|And I’d like to use these to illustrate the scene and what I documented on that day.

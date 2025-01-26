@@ -2,6 +2,7 @@ package cz.marvincz.transcript.tts.timing
 
 import cz.marvincz.transcript.tts.client.fixForXml
 import cz.marvincz.transcript.tts.model.Boundary
+import cz.marvincz.transcript.tts.model.SpeakerType
 import cz.marvincz.transcript.tts.model.SpeechPart
 import kotlin.math.max
 import kotlin.time.Duration.Companion.milliseconds
@@ -12,7 +13,15 @@ class TextBasedTimingGenerator : TimingGenerator {
 
         return buildList {
             speeches.forEach { speech ->
-                index = splitSpeech(this, speech.text, speech.speakerName, boundaries, ssml, index)
+                index = splitSpeech(
+                    builtList = this,
+                    speechText = speech.text,
+                    speaker = speech.speakerName,
+                    speakerType = speech.speaker.speakerType,
+                    boundaries = boundaries,
+                    ssml = ssml,
+                    startIndex = index,
+                )
             }
         }
     }
@@ -21,6 +30,7 @@ class TextBasedTimingGenerator : TimingGenerator {
         builtList: MutableList<Timing>,
         speechText: String,
         speaker: String,
+        speakerType: SpeakerType,
         boundaries: List<Boundary>,
         ssml: String,
         startIndex: Int
@@ -38,7 +48,15 @@ class TextBasedTimingGenerator : TimingGenerator {
             val end = boundaries.firstOrNull { it.textEndOffset == index + xmlSentence.length }?.endOffset
 
             val timing =
-                wipTiming.join(Timing(speaker, sentence, start ?: 0.milliseconds, end ?: 0.milliseconds))
+                wipTiming.join(
+                    Timing(
+                        speaker = speaker,
+                        speakerType = speakerType,
+                        text = sentence,
+                        start = start ?: 0.milliseconds,
+                        end = end ?: 0.milliseconds
+                    )
+                )
             wipTiming = null
 
             if (start != null && end != null) {

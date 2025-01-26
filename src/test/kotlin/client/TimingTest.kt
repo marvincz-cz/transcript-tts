@@ -1,9 +1,7 @@
 package cz.marvincz.transcript.tts.client
 
-import cz.marvincz.transcript.tts.getSubtitles
 import cz.marvincz.transcript.tts.model.Boundary
 import cz.marvincz.transcript.tts.model.SpeechPart
-import cz.marvincz.transcript.tts.subtitlesHeader
 import cz.marvincz.transcript.tts.timing.TextBasedTimingGenerator
 import cz.marvincz.transcript.tts.timing.Timing
 import cz.marvincz.transcript.tts.timing.TimingGenerator
@@ -11,7 +9,6 @@ import cz.marvincz.transcript.tts.timing.VoiceBasedTimingGenerator
 import cz.marvincz.transcript.tts.utils.json
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.time.Duration
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.decodeFromStream
 
@@ -24,7 +21,7 @@ class TimingTest {
             timingGenerator = TextBasedTimingGenerator(),
             speechesResource = "client/testSpeeches.json",
             boundariesResource = "client/testBoundaries.json",
-            expectedResource = "client/testExpected.vtt",
+            expectedResource = "client/testExpected.txt",
         )
     }
 
@@ -35,7 +32,7 @@ class TimingTest {
             timingGenerator = TextBasedTimingGenerator(),
             speechesResource = "client/test2Speeches.json",
             boundariesResource = "client/test2Boundaries.json",
-            expectedResource = "client/test2Expected.vtt",
+            expectedResource = "client/test2Expected.txt",
         )
     }
 
@@ -46,7 +43,7 @@ class TimingTest {
             timingGenerator = VoiceBasedTimingGenerator(),
             speechesResource = "client/openingSpeeches.json",
             boundariesResource = "client/openingBoundaries.json",
-            expectedResource = "client/openingExpected.vtt",
+            expectedResource = "client/openingExpected.txt",
         )
     }
 
@@ -57,7 +54,7 @@ class TimingTest {
             timingGenerator = VoiceBasedTimingGenerator(),
             speechesResource = "client/indiscernibleSpeeches.json",
             boundariesResource = "client/indiscernibleBoundaries.json",
-            expectedResource = "client/indiscernibleExpected.vtt",
+            expectedResource = "client/indiscernibleExpected.txt",
         )
     }
 
@@ -71,7 +68,7 @@ class TimingTest {
             timingGenerator = VoiceBasedTimingGenerator(),
             speechesResource = "client/noAudibleSpeeches.json",
             boundariesResource = "client/noAudibleBoundaries.json",
-            expectedResource = "client/noAudibleExpected.vtt"
+            expectedResource = "client/noAudibleExpected.txt"
         )
     }
 
@@ -89,14 +86,16 @@ class TimingTest {
         val timings = timingGenerator.getTimings(speeches, ssml, boundaries)
 
         val expected = loadResourceAsString(expectedResource)
-        assertEquals(expected, getSubtitles(timings))
+        assertEquals(expected, timings.print())
     }
-
-    private fun getSubtitles(timings: List<Timing>) = "$subtitlesHeader${getSubtitles(timings, Duration.ZERO)}"
 
     private inline fun <reified T> loadResourceAndDeserialize(name: String) =
         json.decodeFromStream<T>(javaClass.classLoader.getResourceAsStream(name)!!)
 
     private fun loadResourceAsString(name: String) =
         javaClass.classLoader.getResourceAsStream(name)!!.reader().use { it.readText() }
+
+    private fun List<Timing>.print() = joinToString(separator = "\n") {
+        "${it.start}|${it.end}|${it.text}"
+    }
 }

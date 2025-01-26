@@ -1,0 +1,13 @@
+50ms|2.275s|Juror number 7-2-5,
+2.275s|3.45s|look at the accused.
+3.7s|5.462500s|Accused, look at the juror.
+5.712500s|6.537500s|Content.
+6.787500s|7.562500s|Content.
+7.812500s|9.712500s|Do you swear that you shall well
+9.887500s|13.95s|and truly try and true deliverance make between our Sovereign Lady the Queen
+14.025s|17.112500s|and the accused at the bar whom you shall have in charge,
+17.112500s|20.125s|and a true verdict give according to the evidence,
+20.125s|21.175s|so help you God?
+21.425s|22.937500s|(NO AUDIBLE RESPONSE)
+23.187500s|24.4s|Madam Clerk,
+24.4s|26.312500s|I am going to ask you to call ten more.

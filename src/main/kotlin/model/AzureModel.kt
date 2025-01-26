@@ -15,6 +15,12 @@ data class AzureSpeaker(
 )
 
 @Serializable
+data class SpeakerInfo(
+    val speaker: AzureSpeaker,
+    val speakerType: SpeakerType,
+)
+
+@Serializable
 data class Expression(
     val style: String = "neutral",
     val role: String? = null,
@@ -23,7 +29,7 @@ data class Expression(
 
 @Serializable
 data class VoiceMapping(
-    val voices: Map<String, AzureSpeaker>,
+    val voices: Map<String, SpeakerInfo>,
     val extras: List<ExtraVoices> = emptyList(),
 )
 
@@ -33,6 +39,7 @@ data class ExtraVoices(
     val speakerRegex: Regex?,
     val speakers: List<String>?,
     val voices: List<AzureSpeaker>,
+    val speakerType: SpeakerType,
     val assignment: AssignmentType,
 ) {
     init {
@@ -41,16 +48,25 @@ data class ExtraVoices(
         }
     }
 
-    fun matches(speaker: String): Boolean = speakerRegex?.matches(speaker) ?: speakers?.contains(speaker) ?: false
+    fun matches(speaker: String): Boolean = (speakerRegex?.matches(speaker) ?: speakers?.contains(speaker)) == true
 
     enum class AssignmentType {
         SpeakerRoundRobin, LineRoundRobin
     }
 }
 
+enum class SpeakerType {
+    Narrator,
+    Court,
+    Crown,
+    Defense,
+    Witness,
+    Other
+}
+
 @Serializable
 data class SpeechPart(
-    val speaker: AzureSpeaker,
+    val speaker: SpeakerInfo,
     val speakerName: String,
     val text: String
 )
