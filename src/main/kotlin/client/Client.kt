@@ -100,6 +100,20 @@ class Client(subscriptionKey: String, region: String) {
             .writeBytes(data)
     }
 
+    fun speakDirect(ssml: String, onProgress: (Float) -> Unit): ByteArray {
+        val textRange = ssml.indexOf("<lang").let { ssml.indexOf(">", it) } until ssml.lastIndexOf("</lang")
+
+        val speechSynthesizer = SpeechSynthesizer(speechConfig, null)
+
+        speechSynthesizer.WordBoundary.addEventListener { _, e ->
+            onProgress((e.textOffset - textRange.first) / (textRange.last - textRange.first).toFloat())
+        }
+
+        val result = speechSynthesizer.SpeakSsml(ssml)
+
+        return result.audioData
+    }
+
     private fun ByteArray.muteIndiscernible(
         boundaries: List<Boundary>,
         format: AudioFormat,

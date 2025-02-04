@@ -33,7 +33,7 @@ import java.util.Properties
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
-fun main(args: Array<String>) = Application().subcommands(Transcript(), VoiceLibrary()).main(args)
+fun main(args: Array<String>) = Application().subcommands(Transcript(), VoiceLibrary(), Direct()).main(args)
 
 private class Application : CliktCommand() {
     init {
@@ -334,5 +334,29 @@ private class VoiceLibrary : AzureCommand() {
             }
 
         echo("Generated sample audio for all available voices at ${dir.absolutePath}")
+    }
+}
+
+private class Direct : AzureCommand() {
+    override fun help(context: Context) = "Generate audio from supplied SSML input"
+
+    private val ssml: String by option().file(mustExist = true, canBeDir = false, mustBeReadable = true)
+        .convert { it.readText() }.required().help { "The SSML input file" }
+
+    private val output: File by option().file(canBeDir = false).required()
+        .help { "The output file where the generated audio will be written" }
+
+    override fun run() {
+        val client = Client(azureConfig.subscriptionKey, azureConfig.region)
+
+        val progress = getProgressBar("Generating")
+        progress.update { total = 1_000 }
+
+        val data = client.speakDirect(ssml) {
+            progress.update(1_000 * it)
+        }
+        progress.update(1_000)
+
+        output.writeBytes(data)
     }
 }
