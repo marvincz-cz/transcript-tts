@@ -22,9 +22,9 @@ import javax.sound.sampled.AudioFormat
 import javax.sound.sampled.AudioSystem
 import kotlin.time.Duration
 
-class Client(subscriptionKey: String, region: String) {
+class Client(config: AzureConfig) {
 
-    private val speechConfig = SpeechConfig.fromSubscription(subscriptionKey, region).apply {
+    private val speechConfig = SpeechConfig.fromSubscription(config.subscriptionKey, config.region).apply {
         // PCM_SIGNED 48000.0 Hz, 16 bit, mono, 2 bytes/frame, little-endian
         setSpeechSynthesisOutputFormat(SpeechSynthesisOutputFormat.Riff48Khz16BitMonoPcm)
     }
@@ -145,3 +145,5 @@ class Client(subscriptionKey: String, region: String) {
         constructor(boundary: Boundary) : this(boundary.offset, boundary.endOffset)
     }
 }
+
+data class AzureConfig(val subscriptionKey: String, val region: String)

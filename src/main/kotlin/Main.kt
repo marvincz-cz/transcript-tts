@@ -15,6 +15,7 @@ import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.enum
 import com.github.ajalt.clikt.parameters.types.file
 import com.github.ajalt.mordant.animation.progress.update
+import cz.marvincz.transcript.tts.client.AzureConfig
 import cz.marvincz.transcript.tts.client.Client
 import cz.marvincz.transcript.tts.model.ExtraVoices
 import cz.marvincz.transcript.tts.model.Line
@@ -66,8 +67,6 @@ private abstract class AzureCommand : CliktCommand() {
         private const val PROPERTY_SUBSCRIPTION_KEY = "subscription_key"
         private const val PROPERTY_REGION = "region"
     }
-
-    data class AzureConfig(val subscriptionKey: String, val region: String)
 }
 
 private class Transcript : AzureCommand() {
@@ -153,7 +152,7 @@ private class Transcript : AzureCommand() {
             }
         }
 
-        val client = Client(azureConfig.subscriptionKey, azureConfig.region)
+        val client = Client(azureConfig)
 
         if (continueFromDuration == null) {
             subtitleFile.writeText(subtitlesHeader)
@@ -319,7 +318,7 @@ private class VoiceLibrary : AzureCommand() {
     override fun help(context: Context) = "Generate sample audio for all available voices and exit"
 
     override fun run() {
-        val client = Client(azureConfig.subscriptionKey, azureConfig.region)
+        val client = Client(azureConfig)
         val dir = File("voices").apply { mkdir() }
 
         val voices = client.getAllVoices()
@@ -347,7 +346,7 @@ private class Direct : AzureCommand() {
         .help { "The output file where the generated audio will be written" }
 
     override fun run() {
-        val client = Client(azureConfig.subscriptionKey, azureConfig.region)
+        val client = Client(azureConfig)
 
         val progress = getProgressBar("Generating")
         progress.update { total = 1_000 }
