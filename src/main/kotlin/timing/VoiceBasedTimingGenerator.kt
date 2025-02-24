@@ -1,5 +1,6 @@
 package cz.marvincz.transcript.tts.timing
 
+import com.microsoft.cognitiveservices.speech.SpeechSynthesisBoundaryType
 import cz.marvincz.transcript.tts.client.fixForXml
 import cz.marvincz.transcript.tts.client.recoverFromXml
 import cz.marvincz.transcript.tts.model.Boundary
@@ -170,3 +171,7 @@ class VoiceBasedTimingGenerator : TimingGenerator {
         return list
     }
 }
+
+private val openingPunctuation = Regex("(\\p{Ps}|\\p{Pi})") // opening brackets and opening quotes
+private fun Boundary.isPunctuation() =
+    type == SpeechSynthesisBoundaryType.Punctuation && !openingPunctuation.matches(text)

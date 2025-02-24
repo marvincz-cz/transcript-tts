@@ -2,10 +2,10 @@ package cz.marvincz.transcript.tts.model
 
 import com.microsoft.cognitiveservices.speech.SpeechSynthesisBoundaryType
 import com.microsoft.cognitiveservices.speech.SpeechSynthesisWordBoundaryEventArgs
-import kotlinx.serialization.Serializable
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.nanoseconds
 import kotlinx.serialization.Contextual
+import kotlinx.serialization.Serializable
 
 
 @Serializable
@@ -55,6 +55,7 @@ data class ExtraVoices(
     }
 }
 
+@Suppress("unused")
 enum class SpeakerType {
     Narrator,
     Court,
@@ -93,8 +94,6 @@ data class Boundary(
     val textEndOffset = textOffset + text.length
 
     fun withPauseTo(next: Boundary) = copy(pause = next.offset - endOffset)
-
-    fun isPunctuation() = type == SpeechSynthesisBoundaryType.Punctuation && text != "("
 }
 
 fun Long.ticksToDuration() = (this * 100).nanoseconds
