@@ -9,6 +9,7 @@ import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.core.terminal
 import com.github.ajalt.clikt.parameters.options.convert
 import com.github.ajalt.clikt.parameters.options.default
+import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.help
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
@@ -33,6 +34,7 @@ import java.io.File
 import java.util.Properties
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.serialization.encodeToString
 
 fun main(args: Array<String>) = Application().subcommands(Transcript(), VoiceLibrary(), Direct()).main(args)
 
@@ -104,6 +106,12 @@ private class Transcript : AzureCommand() {
         """.trimIndent()
     }
 
+    private val debugBoundaries: Boolean by option().flag().help {
+        """
+            Output all word boundaries reported by Azure Speech. Used to debug subtitles.
+        """.trimIndent()
+    }
+
     private var continueFromIndex: Int = -1
     private var continueFromDuration: Duration? = null
 
@@ -138,6 +146,7 @@ private class Transcript : AzureCommand() {
             val choice = prompt("Previous unfinished generation found", listOf("Resume", "Overwrite", "Exit"))
 
             val maxTempIndex = generateSequence(0) { it + 1 }.first { !chunkTempFile(it).exists() } - 1
+            val maxBoundariesIndex = generateSequence(0) { it + 1 }.first { !boundariesFile(it).exists() } - 1
 
             when (choice) {
                 "Resume" -> {
@@ -146,7 +155,10 @@ private class Transcript : AzureCommand() {
                     echo("Resuming after ${maxTempIndex + 1} previously generated chunks")
                 }
 
-                "Overwrite" -> tempFiles(maxTempIndex).forEach { it.delete() }
+                "Overwrite" -> {
+                    tempFiles(maxTempIndex).forEach { it.delete() }
+                    boundariesFiles(maxBoundariesIndex).forEach { it.delete() }
+                }
 
                 else -> throw PrintMessage("Exiting.")
             }
@@ -184,6 +196,9 @@ private class Transcript : AzureCommand() {
             subtitleFile.appendText(getSubtitles(result.timings, chunkOffset))
             if (muteMode == MuteMode.EXPORT) {
                 exportMutedSections(result, chunkOffset)
+            }
+            if (debugBoundaries) {
+                exportBoundaries(result, index)
             }
 
             chunkOffset += result.duration
@@ -255,6 +270,11 @@ private class Transcript : AzureCommand() {
 
     private val mutedSectionsFile by lazy { File(output.path.substringBeforeLast('.') + "-mute.csv") }
 
+    private fun boundariesFile(index: Int) =
+        File(output.path.substringBeforeLast('.') + "-boundaries-${index + 1}.json")
+
+    private fun boundariesFiles(lastIndex: Int) = (0..lastIndex).map { boundariesFile(it) }
+
     private fun mutedSectionsHeader() {
         mutedSectionsFile.writeText("START;LENGTH")
     }
@@ -265,6 +285,10 @@ private class Transcript : AzureCommand() {
                 .map { it.copy(start = it.start + chunkOffset, end = it.end + chunkOffset) }
                 .joinToString(separator = "") { "\n${it.start.rounded()};${it.duration.rounded()}" }
         )
+    }
+
+    private fun exportBoundaries(result: Client.TtsResult, index: Int) {
+        boundariesFile(index).writeText(json.encodeToString(result.boundaries))
     }
 
     private fun Duration.rounded() = inWholeMilliseconds.milliseconds

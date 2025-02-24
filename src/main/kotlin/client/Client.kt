@@ -69,6 +69,7 @@ class Client(config: AzureConfig) {
             timings = timingGenerator.getTimings(speeches, ssml, boundaries),
             duration = correctDuration,
             mutedSections = mutedSections,
+            boundaries = boundaries,
         )
     }
 
@@ -134,7 +135,8 @@ class Client(config: AzureConfig) {
         val audioData: ByteArray,
         val timings: List<Timing>,
         val duration: Duration,
-        val mutedSections: List<AudioSection>
+        val mutedSections: List<AudioSection>,
+        val boundaries: List<Boundary>,
     )
 
     data class AudioSection(
