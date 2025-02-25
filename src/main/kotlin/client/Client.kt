@@ -14,6 +14,7 @@ import cz.marvincz.transcript.tts.model.ticksToDuration
 import cz.marvincz.transcript.tts.timing.Timing
 import cz.marvincz.transcript.tts.timing.VoiceBasedTimingGenerator
 import cz.marvincz.transcript.tts.utils.duration
+import cz.marvincz.transcript.tts.utils.json
 import cz.marvincz.transcript.tts.utils.muteSection
 import cz.marvincz.transcript.tts.utils.replaceAllIndexed
 import java.io.ByteArrayInputStream
@@ -21,6 +22,7 @@ import java.io.File
 import javax.sound.sampled.AudioFormat
 import javax.sound.sampled.AudioSystem
 import kotlin.time.Duration
+import kotlinx.serialization.encodeToString
 
 class Client(config: AzureConfig) {
 
@@ -34,7 +36,7 @@ class Client(config: AzureConfig) {
     /**
      * Synthesize speech from the [speeches]. Callback [onProgress] receives updates with values between 0 and 1 for 0%-100% progress.
      */
-    fun synthesize(speeches: List<SpeechPart>, mute: Boolean, onProgress: (Float) -> Unit): TtsResult {
+    fun synthesize(speeches: List<SpeechPart>, mute: Boolean, boundariesFile: File?, onProgress: (Float) -> Unit): TtsResult {
         val ssml = toSSML(speeches)
         val textRange = ssml.indexOf("<lang").let { ssml.indexOf(">", it) } until ssml.lastIndexOf("</lang")
 
@@ -61,6 +63,8 @@ class Client(config: AzureConfig) {
             else boundary
         }
 
+        boundariesFile?.writeText(json.encodeToString(boundaries))
+
         val mutedSections = mutableListOf<AudioSection>()
         val mutedAudio = result.audioData.muteIndiscernible(boundaries, audioInputStream.format, mutedSections, mute)
 
@@ -69,7 +73,6 @@ class Client(config: AzureConfig) {
             timings = timingGenerator.getTimings(speeches, ssml, boundaries),
             duration = correctDuration,
             mutedSections = mutedSections,
-            boundaries = boundaries,
         )
     }
 
@@ -136,7 +139,6 @@ class Client(config: AzureConfig) {
         val timings: List<Timing>,
         val duration: Duration,
         val mutedSections: List<AudioSection>,
-        val boundaries: List<Boundary>,
     )
 
     data class AudioSection(

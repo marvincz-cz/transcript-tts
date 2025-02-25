@@ -34,7 +34,6 @@ import java.io.File
 import java.util.Properties
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
-import kotlinx.serialization.encodeToString
 
 fun main(args: Array<String>) = Application().subcommands(Transcript(), VoiceLibrary(), Direct()).main(args)
 
@@ -187,18 +186,16 @@ private class Transcript : AzureCommand() {
             val progress = getProgressBar("Chunk ${index + 1}/${chunks.size}")
 
             progress.update { total = 1_000 }
-            val result = client.synthesize(chunk, muteMode == MuteMode.MUTE) {
-                progress.update(1_000 * it)
-            }
+            val result =
+                client.synthesize(chunk, muteMode == MuteMode.MUTE, boundariesFile(index).takeIf { debugBoundaries }) {
+                    progress.update(1_000 * it)
+                }
             progress.update(1_000)
 
             chunkTempFile(index).writeBytes(result.audioData)
             subtitleFile.appendText(getSubtitles(result.timings, chunkOffset))
             if (muteMode == MuteMode.EXPORT) {
                 exportMutedSections(result, chunkOffset)
-            }
-            if (debugBoundaries) {
-                exportBoundaries(result, index)
             }
 
             chunkOffset += result.duration
@@ -285,10 +282,6 @@ private class Transcript : AzureCommand() {
                 .map { it.copy(start = it.start + chunkOffset, end = it.end + chunkOffset) }
                 .joinToString(separator = "") { "\n${it.start.rounded()};${it.duration.rounded()}" }
         )
-    }
-
-    private fun exportBoundaries(result: Client.TtsResult, index: Int) {
-        boundariesFile(index).writeText(json.encodeToString(result.boundaries))
     }
 
     private fun Duration.rounded() = inWholeMilliseconds.milliseconds
