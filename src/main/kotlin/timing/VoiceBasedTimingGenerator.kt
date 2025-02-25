@@ -63,7 +63,7 @@ class VoiceBasedTimingGenerator : TimingGenerator {
             if (text.length <= 85 || pauseFactor == 2) {
                 if (text.length > 85) TextBasedTimingGenerator().splitSpeech(
                     builtList = this,
-                    speechText = speechText,
+                    speechText = text,
                     speaker = speaker,
                     speakerType = speakerType,
                     boundaries = boundaries.filter { it.textOffset in start.textOffset..split.textOffset },
