@@ -152,7 +152,7 @@ private class Transcript : AzureCommand() {
                 "Resume" -> {
                     continueFromIndex = maxTempIndex
                     continueFromDuration = audioDuration(tempFiles(maxTempIndex))
-                    echo("Resuming after ${maxTempIndex + 1} previously generated chunks")
+                    echo("Resuming after ${maxTempIndex + 1} previously generated chunks with $continueFromDuration of audio")
                 }
 
                 "Overwrite" -> {
