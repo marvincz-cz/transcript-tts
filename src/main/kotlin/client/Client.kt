@@ -3,7 +3,6 @@ package cz.marvincz.transcript.tts.client
 import com.microsoft.cognitiveservices.speech.SpeechConfig
 import com.microsoft.cognitiveservices.speech.SpeechSynthesisOutputFormat
 import com.microsoft.cognitiveservices.speech.SpeechSynthesizer
-import com.microsoft.cognitiveservices.speech.VoiceInfo
 import cz.marvincz.transcript.tts.model.AzureSpeaker
 import cz.marvincz.transcript.tts.model.Boundary
 import cz.marvincz.transcript.tts.model.Expression
@@ -22,6 +21,9 @@ import java.io.File
 import javax.sound.sampled.AudioFormat
 import javax.sound.sampled.AudioSystem
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.measureTime
+import kotlinx.coroutines.delay
 import kotlinx.serialization.encodeToString
 
 class Client(config: AzureConfig) {
@@ -48,60 +50,81 @@ class Client(config: AzureConfig) {
             onProgress((e.textOffset - textRange.first) / (textRange.last - textRange.first).toFloat())
         }
 
-        val result = speechSynthesizer.SpeakSsml(ssml)
+        return speechSynthesizer.SpeakSsml(ssml).use { result ->
+            val audioInputStream = AudioSystem.getAudioInputStream(ByteArrayInputStream(result.audioData))
 
-        val audioInputStream = AudioSystem.getAudioInputStream(ByteArrayInputStream(result.audioData))
+            // Azure reports wrong timing information, we try to correct it
+            val correctDuration = audioInputStream.duration
+            val correctionRatio = correctDuration / result.audioDuration.ticksToDuration()
+            boundaries.replaceAll {
+                it.copy(offset = it.offset * correctionRatio, duration = it.duration * correctionRatio)
+            }
+            boundaries.replaceAllIndexed { index, boundary ->
+                if (index != boundaries.lastIndex) boundary.withPauseTo(boundaries[index + 1])
+                else boundary
+            }
 
-        // Azure reports wrong timing information, we try to correct it
-        val correctDuration = audioInputStream.duration
-        val correctionRatio = correctDuration / result.audioDuration.ticksToDuration()
-        boundaries.replaceAll {
-            it.copy(offset = it.offset * correctionRatio, duration = it.duration * correctionRatio)
+            boundariesFile?.writeText(json.encodeToString(boundaries))
+
+            val mutedSections = mutableListOf<AudioSection>()
+            val mutedAudio =
+                result.audioData.muteIndiscernible(boundaries, audioInputStream.format, mutedSections, mute)
+
+            TtsResult(
+                audioData = mutedAudio,
+                timings = timingGenerator.getTimings(speeches, ssml, boundaries),
+                duration = correctDuration,
+                mutedSections = mutedSections,
+            )
         }
-        boundaries.replaceAllIndexed { index, boundary ->
-            if (index != boundaries.lastIndex) boundary.withPauseTo(boundaries[index + 1])
-            else boundary
-        }
-
-        boundariesFile?.writeText(json.encodeToString(boundaries))
-
-        val mutedSections = mutableListOf<AudioSection>()
-        val mutedAudio = result.audioData.muteIndiscernible(boundaries, audioInputStream.format, mutedSections, mute)
-
-        return TtsResult(
-            audioData = mutedAudio,
-            timings = timingGenerator.getTimings(speeches, ssml, boundaries),
-            duration = correctDuration,
-            mutedSections = mutedSections,
-        )
     }
 
-    fun getAllVoices(): List<VoiceInfo> {
+    fun getAllVoices(language: String): List<Pair<SpeakerInfo, String>> {
         val speechSynthesizer = SpeechSynthesizer(speechConfig, null)
 
-        return speechSynthesizer.voicesAsync.get().voices.filter { "Multilingual" in it.shortName || it.locale == "en-CA" }
+        return speechSynthesizer.voicesAsync.get().use { result ->
+            result.voices.filter { "Multilingual" in it.shortName || it.locale == language }
+                .flatMap {
+                    it.use { voice ->
+                        listOf(
+                            SpeakerInfo(
+                                AzureSpeaker(voice.shortName, null, language),
+                                SpeakerType.Other
+                            ) to "${voice.localName} (${voice.shortName}) - default"
+                        ) + voice.styleList.map { style ->
+                            SpeakerInfo(
+                                AzureSpeaker(voice.shortName, Expression(style), language),
+                                SpeakerType.Other
+                            ) to "${voice.localName} (${voice.shortName}) - $style"
+                        }
+                    }
+                }
+        }
     }
 
-    fun generateSpeechSample(voice: VoiceInfo, style: String?) {
-        val speechPart = SpeechPart(
-            speaker = SpeakerInfo(
-                AzureSpeaker(voice.shortName, style?.let { Expression(style = style) }),
-                SpeakerType.Other
-            ),
-            speakerName = "${voice.localName} (${voice.shortName})",
-            text = "Yes, My Lord. Okay. So the -- P-4 -- what is the document entitled? The case involves " +
-                    "an allegation that on or about the 9th day of August, 2016, at or near Biggar, Saskatchewan, " +
-                    "Gerald Stanley unlawfully caused the death of Colten Boushie and thereby committed " +
-                    "second degree murder."
-        )
+    suspend fun generateSpeechSample(output: File, speaker: SpeakerInfo, name: String) {
+        val timeTaken = measureTime {
+            val speechParts = listOf(
+                SpeechPart(speaker, name, "Yes, My Lord."),
+                SpeechPart(speaker, name, "Okay."),
+                SpeechPart(
+                    speaker, name, "So the -- P-4 -- what is the document entitled? The case involves " +
+                            "an allegation that on or about the 9th day of August, 2016, at or near Biggar, Saskatchewan, " +
+                            "Gerald Stanley unlawfully caused the death of Colten Boushie and thereby committed " +
+                            "second degree murder."
+                ),
+            )
 
-        val speechSynthesizer = SpeechSynthesizer(speechConfig, null)
+            val speechSynthesizer = SpeechSynthesizer(speechConfig, null)
 
-        val ssml = toSSML(listOf(speechPart))
-        val data = speechSynthesizer.SpeakSsml(ssml).audioData
+            val ssml = toSSML(speechParts)
+            val data = speechSynthesizer.SpeakSsml(ssml).use { it.audioData }
 
-        File("voices/${voice.localName} (${voice.shortName}) - ${style ?: "default"}.wav")
-            .writeBytes(data)
+            File(output, "$name.wav").writeBytes(data)
+        }
+
+        // throttling, max 20 calls / second
+        delay(3.1.seconds - timeTaken)
     }
 
     fun speakDirect(ssml: String, onProgress: (Float) -> Unit): ByteArray {
@@ -115,7 +138,7 @@ class Client(config: AzureConfig) {
 
         val result = speechSynthesizer.SpeakSsml(ssml)
 
-        return result.audioData
+        return result.use { it.audioData }
     }
 
     private fun ByteArray.muteIndiscernible(

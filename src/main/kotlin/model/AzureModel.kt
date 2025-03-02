@@ -12,6 +12,7 @@ import kotlinx.serialization.Serializable
 data class AzureSpeaker(
     val voiceId: String,
     val expression: Expression? = null,
+    val language: String = "en-CA"
 )
 
 @Serializable

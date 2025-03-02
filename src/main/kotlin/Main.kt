@@ -34,6 +34,7 @@ import java.io.File
 import java.util.Properties
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.runBlocking
 
 fun main(args: Array<String>) = Application().subcommands(Transcript(), VoiceLibrary(), Direct()).main(args)
 
@@ -334,22 +335,28 @@ private class Transcript : AzureCommand() {
 private class VoiceLibrary : AzureCommand() {
     override fun help(context: Context) = "Generate sample audio for all available voices and exit"
 
+    private val language by option().default("en-CA")
+
+    private val output: File by option().file(canBeFile = false).required()
+        .help { "The output directory where the generated samples will be written" }
+
     override fun run() {
         val client = Client(azureConfig)
-        val dir = File("voices").apply { mkdir() }
+        output.mkdir()
 
-        val voices = client.getAllVoices()
+        val voices = client.getAllVoices(language)
 
-        val progress = getProgressBar("Generating")
-        progress.update { total = voices.size.toLong() }
-        voices
-            .flatMap { voice -> listOf(voice to null) + voice.styleList.map { voice to it } }
-            .forEachIndexed { index, (voice, style) ->
-                client.generateSpeechSample(voice, style)
+        runBlocking {
+            val progress = getProgressBar("Generating")
+            progress.update { total = voices.size.toLong() }
+
+            voices.forEachIndexed { index, (speaker, name) ->
+                client.generateSpeechSample(output, speaker, name)
                 progress.update(index + 1)
             }
+        }
 
-        echo("Generated sample audio for all available voices at ${dir.absolutePath}")
+        echo("Generated sample audio for all available voices at ${output.absolutePath}")
     }
 }
 

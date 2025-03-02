@@ -12,6 +12,7 @@ repositories {
 
 dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
     implementation("com.microsoft.cognitiveservices.speech", "client-sdk", "1.41.1", ext = "jar")
     implementation("com.github.ajalt.clikt:clikt:5.0.1")
     implementation("com.github.ajalt.clikt:clikt-markdown:5.0.1")
