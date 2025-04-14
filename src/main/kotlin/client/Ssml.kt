@@ -33,6 +33,7 @@ fun String.fixForXml() = escapeXml()
     .replace("(phonetic)", "")
     .replace("(NO AUDIBLE RESPONSE)", "(NO-AUDIBLE-RESPONSE)")
     .replace("(UNREPORTABLE SOUND)", "(UNREPORTABLE-SOUND)")
+    .replace("--", "…")
 
 private fun String.escapeXml() =
     replace("\"", "&quot;")
@@ -44,6 +45,7 @@ private fun String.escapeXml() =
 fun String.recoverFromXml() = unescapeXml()
     .replace("(NO-AUDIBLE-RESPONSE)", "(NO AUDIBLE RESPONSE)")
     .replace("(UNREPORTABLE-SOUND)", "(UNREPORTABLE SOUND)")
+    .replace("…", "--")
 
 private fun String.unescapeXml() =
     replace("&quot;", "\"")
