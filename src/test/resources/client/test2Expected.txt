@@ -1,7 +1,7 @@
-50ms|3.225s|Thank you, My Lord. I’m just going to start --
-3.237500s|4.625s|open up my laptop here.
-4.875s|6.55s|Yes. You go ahead.
-6.8s|8.237500s|While he’s doing that,
-8.237500s|11.575s|I’ll just say that we’re going to sit until about 11:15.
-11.825s|15.35s|Around 11:15, we’ll take a 15-minute break.
-15.6s|18.375s|So just so you know how long you’re going to have to be sitting there.
+50.287026ms|3.972675086s|Thank you, My Lord. I’m just going to start --
+3.972675086s|5.481285878s|open up my laptop here.
+5.732721010s|7.580769231s|Yes. You go ahead.
+7.832204363s|9.164810563s|While he’s doing that,
+9.164810563s|12.169460390s|I’ll just say that we’re going to sit until about 11:15.
+12.420895522s|15.752411022s|Around 11:15, we’ll take a 15-minute break.
+16.016417910s|19.071354764s|So just so you know how long you’re going to have to be sitting there.

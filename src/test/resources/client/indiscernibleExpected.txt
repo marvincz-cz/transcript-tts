@@ -1,12 +1,14 @@
-50ms|1.262500s|Just the --
-1.275s|4.15s|the TV must shut off after a while.
-4.4s|6.087500s|Are those televisions on?
-6.375s|8.175s|I just turned --
-8.187500s|10.212500s|that should turn both of them on, shouldn’t it?
-10.487500s|12.462500s|Yeah. But this one’s the red.
-12.712500s|15.675s|Oh, maybe (INDISCERNIBLE).
-15.925s|17.112500s|(INDISCERNIBLE).
-17.362500s|18.512500s|Do I have to point it at it?
-18.762500s|19.612500s|Oh, there it comes.
-19.862500s|21.425s|Oh, okay.
-21.675s|23.9s|There we go. We’re up and running.
+50.564103ms|986ms|Just the --
+986ms|3.299307692s|the TV must shut off after a while.
+3.552128205s|5.208102564s|Are those televisions on?
+5.498846154s|6.864076923s|I just turned --
+6.864076923s|8.697025641s|that should turn both of them on,
+8.697025641s|10.138102564s|shouldn’t it? Yeah.
+10.390923077s|11.781435897s|But this one’s the red.
+12.034256410s|14.714153846s|Oh, maybe (INDISCERNIBLE).
+14.966974359s|16.041461538s|(INDISCERNIBLE).
+16.294282051s|17.899692308s|Do I have to point it at it?
+18.152512821s|19.441897436s|Oh, there it comes.
+19.694717949s|21.085230769s|Oh, okay.
+21.338051282s|22.235564102s|There we go.
+22.513666667s|23.461743590s|We’re up and running.
