@@ -1,5 +1,6 @@
 package cz.marvincz.transcript.tts.client
 
+import com.microsoft.cognitiveservices.speech.ResultReason
 import com.microsoft.cognitiveservices.speech.SpeechConfig
 import com.microsoft.cognitiveservices.speech.SpeechSynthesisOutputFormat
 import com.microsoft.cognitiveservices.speech.SpeechSynthesizer
@@ -51,6 +52,9 @@ class Client(config: AzureConfig) {
         }
 
         return speechSynthesizer.SpeakSsml(ssml).use { result ->
+            if (result.reason != ResultReason.SynthesizingAudioCompleted) {
+                println(result.reason)
+            }
             val audioInputStream = AudioSystem.getAudioInputStream(ByteArrayInputStream(result.audioData))
 
             // Azure reports wrong timing information, we try to correct it

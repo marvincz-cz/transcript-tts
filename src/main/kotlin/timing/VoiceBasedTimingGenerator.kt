@@ -57,7 +57,8 @@ class VoiceBasedTimingGenerator : TimingGenerator {
 
             val regex = xmlSentence.split(Regex("\\s"))
                 .joinToString(separator = "\\s+(?:(?:\\(|\\[)[\\w\\s]+(?:\\)|\\])\\s*)?") { Regex.escape(it) }.toRegex()
-            val match = regex.find(speechText, speechIndex)!!
+            val match = regex.find(speechText, speechIndex)
+                ?: throw Exception("Speech not found in \"${speechText.substring(speechIndex)}\" with regex: ${regex.pattern}")
 
             val text = match.value.trim()
             if (text.length <= 85 || pauseFactor == 2) {
